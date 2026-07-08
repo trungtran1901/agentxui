@@ -1,0 +1,27 @@
+version: "3.9"
+
+
+services:
+  portal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: enterprise-agent-portal:latest
+    container_name: eap-portal
+    restart: unless-stopped
+    ports:
+      - "${PORTAL_PORT:-8080}:80"
+    environment:
+      VITE_URL_AUTH: ${VITE_URL_AUTH}
+      VITE_REALM: ${VITE_REALM}
+      VITE_CLIENT_ID: ${VITE_CLIENT_ID}
+      VITE_KEYCLOAK_ENABLED: ${VITE_KEYCLOAK_ENABLED:-true}
+      VITE_AGNO_API_URL: ${VITE_AGNO_API_URL}
+      VITE_MCP_API_URL: ${VITE_MCP_API_URL}
+      VITE_KNOWLEDGE_API_URL: ${VITE_KNOWLEDGE_API_URL}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

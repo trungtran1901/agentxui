@@ -1,0 +1,51 @@
+export const routes = [
+  {
+    path: '/',
+    component: () => import('../layouts/MainLayout.vue'),
+    children: [
+      { path: '', component: () => import('../modules/dashboard/DashboardPage.vue'), name: 'dashboard' },
+      { path: 'ai/agentos', component: () => import('../modules/ai-platform/agentos/AgentOSPage.vue') },
+      { path: 'ai/agentos/:id', component: () => import('../modules/ai-platform/agentos/AgentOSDetail.vue') },
+      { path: 'ai/teams', component: () => import('../modules/ai-platform/teams/TeamsPage.vue') },
+      { path: 'ai/teams/:id', component: () => import('../modules/ai-platform/teams/TeamDetail.vue') },
+      { path: 'ai/agents', component: () => import('../modules/ai-platform/agents/AgentsPage.vue') },
+      { path: 'ai/agents/:id', component: () => import('../modules/ai-platform/agents/AgentDetail.vue') },
+      { path: 'ai/skills', component: () => import('../modules/ai-platform/skills/SkillsPage.vue') },
+      { path: 'ai/skills/:id', component: () => import('../modules/ai-platform/skills/SkillEditor.vue') },
+      { path: 'ai/prompts', component: () => import('../modules/ai-platform/prompts/PromptsPage.vue') },
+      { path: 'ai/models', component: () => import('../modules/ai-platform/models/ModelsPage.vue') },
+      { path: 'ai/workflows', component: () => import('../modules/ai-platform/workflows/WorkflowsPage.vue') },
+      { path: 'ai/workflows/:id/builder', component: () => import('../modules/ai-platform/workflows/WorkflowBuilder.vue') },
+      { path: 'ai/sessions', component: () => import('../modules/ai-platform/sessions/SessionsPage.vue') },
+      { path: 'ai/memory', component: () => import('../modules/ai-platform/memory/MemoryPage.vue') },
+      { path: 'ai/playground', component: () => import('../modules/ai-platform/playground/PlaygroundPage.vue') },
+      { path: 'knowledge/collections', component: () => import('../modules/knowledge/collections/CollectionsPage.vue') },
+      { path: 'knowledge/documents', component: () => import('../modules/knowledge/documents/DocumentsPage.vue') },
+      { path: 'knowledge/acl', component: () => import('../modules/knowledge/acl/ACLTreePage.vue') },
+      { path: 'knowledge/assignments', component: () => import('../modules/knowledge/assignments/AssignmentsPage.vue') },
+      { path: 'knowledge/scopes', component: () => import('../modules/knowledge/scopes/AgentScopesPage.vue') },
+      { path: 'knowledge/search', component: () => import('../modules/knowledge/search/SearchPlayground.vue') },
+      { path: 'knowledge/reindex', component: () => import('../modules/knowledge/reindex/ReindexPage.vue') },
+      { path: 'knowledge/audit', component: () => import('../modules/knowledge/AuditPage.vue') },
+      { path: 'mcp/servers', component: () => import('../modules/mcp/servers/MCPServersPage.vue') },
+      { path: 'mcp/capabilities', component: () => import('../modules/mcp/capabilities/CapabilitiesPage.vue') },
+      { path: 'mcp/assignments', component: () => import('../modules/mcp/assignments/MCPAssignmentsPage.vue') },
+      { path: 'mcp/logs', component: () => import('../modules/mcp/logs/ExecutionLogsPage.vue') },
+      { path: 'mcp/console', component: () => import('../modules/mcp/console/TestingConsolePage.vue') },
+      { path: 'ops/events', component: () => import('../modules/operations/events/EventsPage.vue') },
+      { path: 'ops/logs', component: () => import('../modules/operations/logs/ExecLogsPage.vue') },
+      { path: 'ops/audit', component: () => import('../modules/operations/audit/AuditLogsPage.vue') },
+      { path: 'ops/monitoring', component: () => import('../modules/operations/monitoring/MonitoringPage.vue') },
+      { path: 'system/settings', component: () => import('../modules/system/settings/SettingsPage.vue') },
+      { path: 'system/flags', component: () => import('../modules/system/flags/FeatureFlagsPage.vue') },
+      { path: 'system/jobs', component: () => import('../modules/system/jobs/BackgroundJobsPage.vue') },
+      { path: 'system/environment', component: () => import('../modules/system/environment/EnvironmentPage.vue') }
+    ]
+  },
+  {
+    path: '/401',
+    name: 'unauthorized',
+    component: () => import('../shared/components/UnauthorizedPage.vue')
+  },
+  { path: '/:catchAll(.*)*', component: () => import('../shared/components/NotFoundPage.vue') }
+]
