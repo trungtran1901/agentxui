@@ -39,7 +39,9 @@ export const routes = [
       { path: 'system/settings', component: () => import('../modules/system/settings/SettingsPage.vue') },
       { path: 'system/flags', component: () => import('../modules/system/flags/FeatureFlagsPage.vue') },
       { path: 'system/jobs', component: () => import('../modules/system/jobs/BackgroundJobsPage.vue') },
-      { path: 'system/environment', component: () => import('../modules/system/environment/EnvironmentPage.vue') }
+      { path: 'system/environment', component: () => import('../modules/system/environment/EnvironmentPage.vue') },
+      { path: 'knowledge/sources', component: () => import('../modules/knowledge/sources/SourcesPage.vue') },
+      { path: 'knowledge/webhooks', component: () => import('../modules/knowledge/webhooks/WebhooksPage.vue') },
     ]
   },
   {

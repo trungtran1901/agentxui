@@ -311,6 +311,116 @@ class KnowledgePlatformClient {
     const { data } = await this.httpHealth.get('/version')
     return data // { name, version, env }
   }
+  // =============================================
+  // SOURCES (v2) — Connector-based ingestion registry
+  // Replaces manual "Documents Upload" as the primary ingestion model.
+  // =============================================
+
+  /** GET /sources?collection_id={id} */
+  async listSources(params) {
+    const { data } = await this.http.get('/sources', { params })
+    return data // Source[]
+  }
+
+  async getSource(id) {
+    const { data } = await this.http.get(`/sources/${id}`)
+    return data
+  }
+
+  /** POST /sources — configuration shape is dynamic per connector,
+   *  driven by GET /connectors[].config_schema. Never hardcode fields. */
+  async createSource(body) {
+    const { data } = await this.http.post('/sources', body)
+    return data
+  }
+
+  async updateSource(id, body) {
+    const { data } = await this.http.put(`/sources/${id}`, body)
+    return data
+  }
+
+  async deleteSource(id) {
+    await this.http.delete(`/sources/${id}`)
+  }
+
+  async syncSource(id) {
+    const { data } = await this.http.post(`/sources/${id}/sync`)
+    return data
+  }
+
+  async stopSource(id) {
+    const { data } = await this.http.post(`/sources/${id}/stop`)
+    return data
+  }
+
+  async getSourceHealth(id) {
+    const { data } = await this.http.get(`/sources/${id}/health`)
+    return data
+  }
+
+  async listSourceJobs(id) {
+    const { data } = await this.http.get(`/sources/${id}/jobs`)
+    return data // SyncJob[]
+  }
+
+  async reindexSource(id) {
+    const { data } = await this.http.post(`/sources/${id}/reindex`)
+    return data
+  }
+
+  // =============================================
+  // CONNECTORS (v2) — Plugin registry, drives dynamic config forms
+  // =============================================
+
+  async listConnectors() {
+    const { data } = await this.http.get('/connectors')
+    return data // [{ type_code, display_name, description, enabled, config_schema }]
+  }
+
+  async listRegisteredConnectors() {
+    const { data } = await this.http.get('/connectors/registered')
+    return data
+  }
+
+  // =============================================
+  // PREVIEW (v2)
+  // =============================================
+
+  async previewUrl(body) {
+    const { data } = await this.http.post('/preview/url', body)
+    return data
+  }
+
+  async previewSource(sourceId, maxResources) {
+    const { data } = await this.http.post(`/preview/source/${sourceId}`, null, {
+      params: maxResources ? { max_resources: maxResources } : undefined
+    })
+    return data
+  }
+
+  async previewChunks(body) {
+    const { data } = await this.http.post('/preview/chunks', body)
+    return data
+  }
+
+  // =============================================
+  // WEBHOOKS (v2)
+  // =============================================
+
+  async createWebhook(body) {
+    const { data } = await this.http.post('/webhooks', body)
+    return data
+  }
+
+  async listWebhooks(params) {
+    const { data } = await this.http.get('/webhooks', { params })
+    return data // Webhook[]
+  }
+
+  async deleteWebhook(id) {
+    await this.http.delete(`/webhooks/${id}`)
+  }
+  // POST /webhooks/receive/{token} is called by EXTERNAL systems only — not used here.
 }
 
 export const knowledgeClient = new KnowledgePlatformClient()

@@ -259,8 +259,10 @@ export default defineComponent({
     ]
 
     const knowledgeItems = [
+      { label: 'Sources', icon: 'hub', to: '/knowledge/sources' },
       { label: 'Collections', icon: 'folder_open', to: '/knowledge/collections' },
       { label: 'Documents', icon: 'description', to: '/knowledge/documents' },
+      { label: 'Webhooks', icon: 'webhook', to: '/knowledge/webhooks' },
       { label: 'ACL Tree', icon: 'account_tree', to: '/knowledge/acl' },
       { label: 'Assignments', icon: 'assignment_ind', to: '/knowledge/assignments' },
       { label: 'Search', icon: 'manage_search', to: '/knowledge/search' },
