@@ -36,12 +36,14 @@ export const routes = [
       { path: 'ops/logs', component: () => import('../modules/operations/logs/ExecLogsPage.vue') },
       { path: 'ops/audit', component: () => import('../modules/operations/audit/AuditLogsPage.vue') },
       { path: 'ops/monitoring', component: () => import('../modules/operations/monitoring/MonitoringPage.vue') },
+      { path: 'ops/observability', component: () => import('../modules/operations/observability/ObservabilityPage.vue') },
       { path: 'system/settings', component: () => import('../modules/system/settings/SettingsPage.vue') },
       { path: 'system/flags', component: () => import('../modules/system/flags/FeatureFlagsPage.vue') },
       { path: 'system/jobs', component: () => import('../modules/system/jobs/BackgroundJobsPage.vue') },
       { path: 'system/environment', component: () => import('../modules/system/environment/EnvironmentPage.vue') },
       { path: 'knowledge/sources', component: () => import('../modules/knowledge/sources/SourcesPage.vue') },
       { path: 'knowledge/webhooks', component: () => import('../modules/knowledge/webhooks/WebhooksPage.vue') },
+      { path: 'business-objects', component: () => import('../modules/business-objects/BusinessObjectsPage.vue') },
     ]
   },
   {

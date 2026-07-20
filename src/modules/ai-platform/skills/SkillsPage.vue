@@ -70,6 +70,25 @@
                 </span>
               </div>
             </template>
+            <template v-else-if="props.row.skill_type === 'WORKFLOW'">
+              <div style="display:flex;align-items:center;gap:5px">
+                <q-icon name="account_tree" size="12px" style="color:#d97706;flex-shrink:0" />
+                <span style="font-size:12px;color:var(--text-secondary);font-weight:500">
+                  {{ workflowLabel(props.row.config?.workflowCode) }}
+                </span>
+                <span v-if="props.row.config?.maxTriggerDepth != null" class="code-tag" style="font-size:9px">
+                  depth {{ props.row.config.maxTriggerDepth }}
+                </span>
+              </div>
+            </template>
+            <template v-else-if="props.row.skill_type === 'UI'">
+              <div style="display:flex;align-items:center;gap:5px;max-width:320px">
+                <q-icon name="touch_app" size="12px" style="color:#ec4899;flex-shrink:0" />
+                <span style="font-size:12px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                  {{ props.row.instructions || '—' }}
+                </span>
+              </div>
+            </template>
             <template v-else>
               <div style="display:flex;flex-wrap:wrap;gap:4px;max-width:280px">
                 <span v-for="c in (props.value||[]).slice(0,3)" :key="c" class="code-tag">{{ c }}</span>
@@ -127,7 +146,7 @@
             <button v-for="t in skillTypes" :key="t.value"
               :class="['skill-type-pill', form.skill_type===t.value && 'skill-type-pill--active']"
               :style="form.skill_type===t.value ? `border-color:${t.color};background:${t.bg};color:${t.color}` : ''"
-              @click="form.skill_type = t.value; form.capability_codes = []; form.config = defaultConfig(t.value)">
+              @click="form.skill_type = t.value; form.capability_codes = []; form.config = defaultConfig(t.value); form.instructions = ''">
               <q-icon :name="t.icon" size="14px" />
               {{ t.label }}
             </button>
@@ -275,6 +294,89 @@
           </div>
         </div>
 
+        <!-- WORKFLOW config section -->
+        <div v-if="form.skill_type === 'WORKFLOW'" class="knowledge-config-panel" style="border-color:rgba(245,158,11,0.25);background:rgba(245,158,11,0.03)">
+          <div class="knowledge-config-panel__header" style="background:rgba(245,158,11,0.06);border-bottom-color:rgba(245,158,11,0.15);color:#b45309">
+            <q-icon name="account_tree" size="16px" style="color:#d97706" />
+            <span>Workflow Trigger Config</span>
+            <code class="code-tag" style="margin-left:auto;font-size:10px">WorkflowSkillConfig</code>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;padding:16px">
+            <div>
+              <label class="field-label">workflowCode <span style="color:var(--brand-danger)">*</span></label>
+              <q-select
+                v-model="form.config.workflowCode"
+                :options="workflowOptions"
+                outlined dense emit-value map-options clearable
+                placeholder="Select workflow…"
+                :loading="loadingWorkflows"
+                use-input input-debounce="0"
+                @filter="filterWorkflows"
+              >
+                <template #option="scope">
+                  <q-item v-bind="scope.itemProps">
+                    <q-item-section avatar>
+                      <div style="width:28px;height:28px;border-radius:6px;background:rgba(245,158,11,0.1);color:#d97706;display:flex;align-items:center;justify-content:center">
+                        <q-icon name="account_tree" size="14px" />
+                      </div>
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label style="font-size:13px;font-weight:600">{{ scope.opt.label }}</q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
+                <template #no-option>
+                  <q-item>
+                    <q-item-section class="text-grey">No workflows found</q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+              <div style="font-size:11px;color:var(--text-quaternary);margin-top:3px">
+                The workflow (by code) this skill triggers when the agent invokes it — e.g. <code class="code-tag" style="font-size:10px">leave_request_flow</code>
+              </div>
+            </div>
+
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <label class="field-label" style="margin:0">maxTriggerDepth <span style="color:var(--brand-danger)">*</span></label>
+                <span class="code-tag">{{ form.config.maxTriggerDepth }}</span>
+              </div>
+              <q-slider v-model="form.config.maxTriggerDepth" :min="1" :max="5" :step="1" color="orange" />
+              <div style="font-size:11px;color:var(--text-quaternary);margin-top:3px">
+                Recursion guard — caps how many nested workflow-triggers-workflow hops are allowed before the run is stopped (prevents infinite trigger loops). Default: 1.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- UI config section — Action DSL guidance instructions -->
+        <div v-if="form.skill_type === 'UI'" class="knowledge-config-panel" style="border-color:rgba(236,72,153,0.25);background:rgba(236,72,153,0.03)">
+          <div class="knowledge-config-panel__header" style="background:rgba(236,72,153,0.06);border-bottom-color:rgba(236,72,153,0.15);color:#be185d">
+            <q-icon name="touch_app" size="16px" style="color:#ec4899" />
+            <span>UI Action Instructions</span>
+            <code class="code-tag" style="margin-left:auto;font-size:10px">propose_ui_action</code>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px;padding:16px">
+            <div>
+              <label class="field-label">instructions <span style="color:var(--brand-danger)">*</span></label>
+              <textarea v-model="form.instructions" class="ui-instructions-textarea" rows="6"
+                placeholder="Khi nhân viên mô tả nhu cầu nghỉ phép bằng lời, hãy dùng tool propose_ui_action để điền các field trên form leave-request-form (leave.startDate, leave.endDate, leave.reason, leave.type). KHÔNG tự ý bấm nút submit (leave.submit) — chỉ điền, để nhân viên tự xác nhận và bấm gửi." />
+            </div>
+            <div class="ui-hint-box">
+              <q-icon name="info" size="16px" style="color:#ec4899;flex-shrink:0" />
+              <div>
+                Guides the agent to call <code class="code-tag" style="font-size:10px">propose_ui_action</code> and target
+                <strong>UI Metadata component codes</strong> (e.g. <code class="code-tag" style="font-size:10px">leave.startDate</code>) —
+                never raw CSS selectors. Be explicit about which actions are allowed (e.g. <code class="code-tag" style="font-size:10px">SET_VALUE</code>)
+                and which are off-limits (e.g. <code class="code-tag" style="font-size:10px">CLICK_BUTTON</code> on a submit target) so the agent fills
+                the form but leaves confirmation to the human. See the Business Objects / UI Metadata browsers to look up exact component codes.
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div v-if="apiError" class="api-error-box">
           <q-icon name="error_outline" size="16px" />{{ apiError }}
         </div>
@@ -371,6 +473,7 @@ export default defineComponent({
     const rows = ref([]), loading = ref(false), saving = ref(false), filterType = ref(null)
     const dialog = ref(false), editItem = ref(null), apiError = ref('')
     const allCollections = ref([]), collectionOptions = ref([]), loadingCollections = ref(false)
+    const allWorkflows = ref([]), workflowOptions = ref([]), loadingWorkflows = ref(false)
     const testDialog = ref(false), testSkill = ref(null), testQuery = ref('')
     const testQueryFocus = ref(false), testing = ref(false), testResult = ref(null)
     const pagination = ref({ page: 1, rowsPerPage: 50, rowsNumber: 0 })
@@ -380,6 +483,7 @@ export default defineComponent({
       { value: 'KNOWLEDGE', label: 'Knowledge', icon: 'storage', color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)', desc: 'Searches a Knowledge Platform collection and injects context into agent instructions' },
       { value: 'WORKFLOW', label: 'Workflow', icon: 'account_tree', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)', desc: 'Triggers a workflow execution' },
       { value: 'PROMPT', label: 'Prompt', icon: 'article', color: '#3b82f6', bg: 'rgba(59,130,246,0.08)', desc: 'Injects a prompt template as additional instructions' },
+      { value: 'UI', label: 'UI', icon: 'touch_app', color: '#ec4899', bg: 'rgba(236,72,153,0.08)', desc: 'Guides the agent to propose UI Actions (Action DSL) via the propose_ui_action tool — fills/interacts with a specific form without submitting it' },
       { value: 'CUSTOM', label: 'Custom', icon: 'code', color: '#6b7280', bg: 'rgba(107,114,128,0.08)', desc: 'Custom executor via capability codes' }
     ]
 
@@ -405,12 +509,18 @@ export default defineComponent({
           stream: false
         }
       }
+      if (type === 'WORKFLOW') {
+        return {
+          workflowCode: '',
+          maxTriggerDepth: 1
+        }
+      }
       return {}
     }
 
     const defaultForm = () => ({
       code: '', name: '', description: '', skill_type: 'MCP',
-      capability_codes: [], config: {}, enabled: true
+      capability_codes: [], config: {}, instructions: '', enabled: true
     })
     const form = ref(defaultForm())
 
@@ -444,6 +554,31 @@ export default defineComponent({
         collectionOptions.value = allCollections.value.filter(
           c => c.label.toLowerCase().includes(q) || (c.code || '').toLowerCase().includes(q)
         )
+      })
+    }
+
+    async function loadWorkflows() {
+      loadingWorkflows.value = true
+      try {
+        // GET /workflows — same listing used by WorkflowsPage.vue's step builder
+        const res = await agnoClient.listWorkflows({ page_size: 100 })
+        allWorkflows.value = res.items.map(w => ({ label: `${w.name} (${w.code})`, value: w.code }))
+        workflowOptions.value = [...allWorkflows.value]
+      } catch { allWorkflows.value = []; workflowOptions.value = [] }
+      finally { loadingWorkflows.value = false }
+    }
+
+    function workflowLabel(code) {
+      if (!code) return '—'
+      const found = allWorkflows.value.find(w => w.value === code)
+      return found ? found.label : code
+    }
+
+    function filterWorkflows(val, update) {
+      update(() => {
+        if (!val) { workflowOptions.value = [...allWorkflows.value]; return }
+        const q = val.toLowerCase()
+        workflowOptions.value = allWorkflows.value.filter(w => w.label.toLowerCase().includes(q))
       })
     }
 
@@ -482,6 +617,7 @@ export default defineComponent({
         skill_type: item.skill_type || 'MCP',
         capability_codes: [...(item.capability_codes || [])],
         config: item.config ? { ...defaultConfig(item.skill_type || 'MCP'), ...item.config } : defaultConfig(item.skill_type || 'MCP'),
+        instructions: item.instructions || '',
         enabled: item.enabled !== undefined ? item.enabled : true
       }
       dialog.value = true
@@ -502,6 +638,17 @@ export default defineComponent({
           apiError.value = 'knowledgeBaseUrl and collectionId are required for Knowledge skills'; return
         }
       }
+      if (form.value.skill_type === 'WORKFLOW') {
+        if (!form.value.config.workflowCode) {
+          apiError.value = 'workflowCode is required for Workflow skills'; return
+        }
+        if (!form.value.config.maxTriggerDepth || form.value.config.maxTriggerDepth < 1) {
+          apiError.value = 'maxTriggerDepth must be at least 1'; return
+        }
+      }
+      if (form.value.skill_type === 'UI' && !form.value.instructions.trim()) {
+        apiError.value = 'instructions is required for UI skills'; return
+      }
       saving.value = true; apiError.value = ''
       try {
         const payload = {
@@ -511,7 +658,8 @@ export default defineComponent({
           skill_type: form.value.skill_type,
           enabled: form.value.enabled,
           ...((['MCP', 'CUSTOM'].includes(form.value.skill_type)) ? { capability_codes: form.value.capability_codes } : {}),
-          ...(form.value.skill_type === 'KNOWLEDGE' ? { config: form.value.config } : {})
+          ...((['KNOWLEDGE', 'WORKFLOW'].includes(form.value.skill_type)) ? { config: form.value.config } : {}),
+          ...(form.value.skill_type === 'UI' ? { instructions: form.value.instructions } : {})
         }
         if (editItem.value) await agnoClient.updateSkill(editItem.value.id, payload)
         else await agnoClient.createSkill(payload)
@@ -550,8 +698,8 @@ export default defineComponent({
         .onOk(async () => { await agnoClient.deleteSkill(item.id); loadData() })
     }
 
-    onMounted(() => { loadData(); loadCollections() })
-    return { rows, columns, loading, saving, filterType, skillTypeOptions, dialog, editItem, form, apiError, pagination, skillTypes, currentType, skillTypeIcon, defaultConfig, allCollections, collectionOptions, loadingCollections, collectionLabel, filterCollections, testDialog, testSkill, testQuery, testQueryFocus, testing, testResult, loadData, onRequest, openCreate, openEdit, save, openTest, runTest, confirmDelete }
+    onMounted(() => { loadData(); loadCollections(); loadWorkflows() })
+    return { rows, columns, loading, saving, filterType, skillTypeOptions, dialog, editItem, form, apiError, pagination, skillTypes, currentType, skillTypeIcon, defaultConfig, allCollections, collectionOptions, loadingCollections, collectionLabel, filterCollections, allWorkflows, workflowOptions, loadingWorkflows, workflowLabel, filterWorkflows, testDialog, testSkill, testQuery, testQueryFocus, testing, testResult, loadData, onRequest, openCreate, openEdit, save, openTest, runTest, confirmDelete }
   }
 })
 </script>
@@ -599,6 +747,7 @@ export default defineComponent({
   &--knowledge { background: rgba(139,92,246,0.1); color: #8b5cf6; }
   &--workflow  { background: rgba(245,158,11,0.1); color: #d97706; }
   &--prompt    { background: rgba(59,130,246,0.1); color: #3b82f6; }
+  &--ui        { background: rgba(236,72,153,0.1); color: #ec4899; }
   &--custom    { background: var(--surface-sunken); color: var(--text-tertiary); }
 }
 
@@ -611,6 +760,7 @@ export default defineComponent({
   &--knowledge { background: rgba(139,92,246,0.1); color: #8b5cf6; }
   &--workflow  { background: rgba(245,158,11,0.1); color: #d97706; }
   &--prompt    { background: rgba(59,130,246,0.1); color: #3b82f6; }
+  &--ui        { background: rgba(236,72,153,0.1); color: #ec4899; }
   &--custom    { background: var(--surface-sunken); color: var(--text-tertiary); }
 }
 
@@ -637,5 +787,34 @@ export default defineComponent({
   border-color: rgba(139,92,246,0.3);
   background: rgba(139,92,246,0.05);
   &__header { background: rgba(139,92,246,0.1); color: #a78bfa; }
+}
+
+.ui-instructions-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.7;
+  resize: vertical;
+  outline: none;
+  background: var(--surface-base);
+  color: var(--text-primary);
+
+  &:focus { border-color: #ec4899; box-shadow: 0 0 0 3px rgba(236,72,153,0.15); }
+}
+
+.ui-hint-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-overlay);
+  border: 1px solid var(--border-subtle);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--text-secondary);
 }
 </style>

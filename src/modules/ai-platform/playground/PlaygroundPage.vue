@@ -18,10 +18,21 @@
             label="Agent" style="width:175px" :disable="!agentOsCode" />
         </div>
         <div class="play-toolbar__divider" />
-        <div class="play-mode-toggle">
+        <div class="play-mode-toggle" v-if="!multiAgentMode">
           <button :class="['play-mode-btn', !useStream && 'play-mode-btn--active']" @click="useStream=false">Sync</button>
           <button :class="['play-mode-btn', useStream && 'play-mode-btn--active']" @click="useStream=true">Stream</button>
         </div>
+        <span v-else class="code-tag" style="font-size:10px">streaming n/a in multi-agent mode</span>
+
+        <!-- v2 — advanced / multi-agent mode toggle (POST /execution-plans/run).
+             Additive: chat behaves exactly as before when this is off. -->
+        <button v-if="executionPlansAvailable"
+          class="play-multiagent-toggle" :class="multiAgentMode && 'play-multiagent-toggle--active'"
+          @click="toggleMultiAgentMode"
+          title="Advanced: run an ordered multi-agent execution plan instead of single-turn chat">
+          <q-icon name="route" size="13px" />
+          Multi-agent
+        </button>
       </div>
 
       <div style="display:flex;align-items:center;gap:8px">
@@ -32,6 +43,38 @@
           <q-icon name="add" size="14px" />
           New Session
         </button>
+      </div>
+    </div>
+
+    <!-- v2 — Execution Plan step builder (only shown in multi-agent mode) -->
+    <div v-if="multiAgentMode" class="plan-steps-bar">
+      <div class="plan-steps-bar__label">
+        <q-icon name="route" size="14px" style="color:var(--brand-primary)" />
+        Plan steps
+        <span class="code-tag" style="font-size:9px">POST /execution-plans/run</span>
+      </div>
+
+      <div v-for="(s, i) in planSteps" :key="i" class="plan-step-chip">
+        <span class="plan-step-chip__order">{{ i + 1 }}</span>
+        <q-select v-model="s.targetType" :options="['Agent','Team']" dense borderless
+          style="width:66px" @update:model-value="s.agentCode=null; s.teamCode=null" />
+        <q-select v-if="s.targetType === 'Agent'" v-model="s.agentCode" :options="planAgentOptions"
+          dense borderless emit-value map-options placeholder="agent_code" style="width:170px" />
+        <q-select v-else v-model="s.teamCode" :options="planTeamOptions"
+          dense borderless emit-value map-options placeholder="team_code" style="width:170px" />
+        <q-input v-model.number="s.maxRetries" dense borderless type="number" min="0" style="width:46px"
+          title="max_retries" />
+        <button class="btn btn--ghost btn--icon-sm" @click="removePlanStep(i)" title="Remove step">
+          <q-icon name="close" size="13px" style="color:var(--brand-danger)" />
+        </button>
+      </div>
+
+      <button class="btn btn--secondary btn--sm" @click="addPlanStep">
+        <q-icon name="add" size="13px" /> Add step
+      </button>
+
+      <div v-if="!planSteps.length" style="font-size:11px;color:var(--text-quaternary);padding:0 4px">
+        No steps yet — falls back to a single-step plan against the selected AgentOS if you send anyway
       </div>
     </div>
 
@@ -127,6 +170,7 @@
             <textarea
               v-model="userInput"
               class="play-textarea"
+              :class="{ 'play-textarea--highlighted': highlightInput }"
               :placeholder="sessionId ? 'Type a message… (Enter to send, Shift+Enter for newline)' : 'Start a session first…'"
               :disabled="!sessionId || thinking"
               rows="1"
@@ -233,6 +277,29 @@
               <div style="font-size:10px;color:var(--text-quaternary);margin-top:4px">{{ dayjs(m.created_at).format('YYYY-MM-DD HH:mm') }}</div>
             </div>
           </div>
+
+          <!-- Plan (v2 — Execution Plans step timeline) -->
+          <div v-show="rightTab==='plan'">
+            <div v-if="!lastPlanRunId" class="empty-state" style="padding:40px 16px">
+              <div class="empty-state__icon"><q-icon name="route" /></div>
+              <div class="empty-state__title">No plan run yet</div>
+              <div class="empty-state__desc">Turn on Multi-agent mode, add steps, and send a message to run a POST /execution-plans/run.</div>
+            </div>
+            <template v-else>
+              <div style="padding:10px 8px 4px">
+                <span class="code-tag" style="font-size:10px">planRunId: {{ lastPlanRunId.substring(0,18) }}…</span>
+              </div>
+              <div v-if="!planStepTimeline" class="empty-state" style="padding:32px 16px">
+                <div class="empty-state__icon"><q-icon name="hourglass_empty" /></div>
+                <div class="empty-state__title">Step timeline not available</div>
+                <div class="empty-state__desc">
+                  The aggregated result above already reflects the completed run. A per-step timeline endpoint
+                  wasn't confirmed in the v2 API reference — this panel will populate automatically once one is available.
+                </div>
+              </div>
+              <pre v-else class="code-block" style="margin:8px;font-size:11px">{{ JSON.stringify(planStepTimeline, null, 2) }}</pre>
+            </template>
+          </div>
           <!-- cURL -->
           <div v-show="rightTab==='curl'" class="play-curl">
             <div class="play-curl__header">
@@ -273,15 +340,22 @@
 <script>
 import { defineComponent, ref, nextTick, onMounted, watch } from 'vue'
 import { useQuasar } from 'quasar'
+import { useRouter } from 'vue-router'
 import { agnoClient } from '../../../services/api/agno-runtime.client.js'
 import { keycloakService } from '../../../services/keycloak.service.js'
 import { useUIStore } from '../../../stores/ui.store.js'
+import { buildUiContext } from '../../../services/ui/uiContext.js'
+import { useUIActionTarget } from '../../../services/ui/actionRegistry.js'
+import { executeUIActionPlan } from '../../../services/ui/actionExecutor.js'
+import { runtimeEventsClient } from '../../../services/api/runtime-events.client.js'
+import { executionPlansClient } from '../../../services/api/execution-plans.client.js'
 import dayjs from 'dayjs'
 
 export default defineComponent({
   name: 'PlaygroundPage',
   setup() {
     const $q = useQuasar()
+    const router = useRouter()
     const uiStore = useUIStore()
     uiStore.setBreadcrumbs([{ label: 'AI Platform' }, { label: 'Playground' }])
 
@@ -301,15 +375,48 @@ export default defineComponent({
     // userId from Keycloak sub claim
     const userId = ref(keycloakService.getUserId() || '')
 
+    // ── v2 Execution Plans — "advanced / multi-agent mode" ─────────────────
+    // Additive alternative to the normal single-turn chat above — NOT a
+    // replacement. When off, send() behaves exactly as before this feature
+    // existed (see the branch inside send()).
+    const multiAgentMode = ref(false)
+    const executionPlansAvailable = ref(true) // flips to false the first time run() reports disabled:true (404) — see sendExecutionPlan()
+    const planSteps = ref([])                  // [{ targetType: 'Agent'|'Team', agentCode, teamCode, max_retries }]
+    const planAgentOptions = ref([]), planTeamOptions = ref([]) // global (not team-scoped) — lazy-loaded on first toggle-on
+    const planOptionsLoaded = ref(false)
+    const lastPlanRunId = ref(null)
+    const planStepTimeline = ref(null)          // best-effort — see execution-plans.client.js
+
     const panelTabs = [
       { key: 'events', label: 'Events', icon: 'event_note' },
       { key: 'runs', label: 'Runs', icon: 'history' },
       { key: 'memory', label: 'Memory', icon: 'memory' },
+      { key: 'plan', label: 'Plan', icon: 'route' },
       { key: 'curl', label: 'cURL', icon: 'code' }
     ]
 
     const scrollBottom = () => nextTick(() => { if (msgRef.value) msgRef.value.scrollTop = msgRef.value.scrollHeight })
     const autoResize = () => { if (textareaRef.value) { textareaRef.value.style.height = 'auto'; textareaRef.value.style.height = Math.min(textareaRef.value.scrollHeight, 160) + 'px' } }
+
+    // ── Action DSL demo targets ──────────────────────────────────────────
+    // Registers this page's message box + send button as addressable UI
+    // Metadata component codes, so an agent-proposed UIActionPlan (see
+    // executeUIActionPlan below) can actually SET_VALUE + CLICK_BUTTON
+    // against them. This is the reference implementation any future
+    // dynamic-metadata-driven component (#1's rendering half) should
+    // follow: call useUIActionTarget(code, handlers) once in setup().
+    const highlightInput = ref(false)
+    useUIActionTarget('ai-playground.message-input', {
+      setValue: (v) => { userInput.value = String(v ?? ''); nextTick(autoResize) },
+      focus: () => textareaRef.value?.focus(),
+      highlight: () => {
+        highlightInput.value = true
+        setTimeout(() => { highlightInput.value = false }, 1500)
+      }
+    })
+    useUIActionTarget('ai-playground.send-button', {
+      click: () => send()
+    })
 
     async function loadOptions() {
       try {
@@ -359,19 +466,122 @@ export default defineComponent({
       messages.value.push({ id: Date.now().toString(), role: 'user', content, created_at: new Date() })
       scrollBottom(); thinking.value = true
 
+      // v2 — "advanced / multi-agent mode": an alternative dispatch path,
+      // not a replacement for the chat flow below. Early-return keeps the
+      // normal single-turn body/uiContext construction and sendSync/
+      // sendStream untouched when this toggle is off (the default).
+      if (multiAgentMode.value) {
+        await sendExecutionPlan(content)
+        return
+      }
+
       // POST /chat body contract: agentOs, team, agent (optional), message, session_id, user_id
+      // uiContext (v2, optional/additive): only attached when non-empty — see
+      // buildUiContext(). Omitting it entirely preserves pre-v2 behavior.
+      const uiContext = buildUiContext({
+        applicationId: agentOsCode.value || undefined,
+        pageId: 'ai-playground',
+        currentRecord: sessionId.value && sessionId.value !== 'pending' ? { sessionId: sessionId.value } : undefined,
+        variables: { team: teamCode.value || undefined, agent: agentCode.value || undefined }
+      })
+
       const body = {
         agentOs: agentOsCode.value,
         ...(teamCode.value ? { team: teamCode.value } : {}),
         ...(agentCode.value ? { agent: agentCode.value } : {}),
         message: content,
         ...(sessionId.value !== 'pending' ? { session_id: sessionId.value } : {}),
-        ...(userId.value ? { user_id: userId.value } : {})
+        ...(userId.value ? { user_id: userId.value } : {}),
+        ...(uiContext ? { uiContext } : {})
       }
 
       if (useStream.value) await sendStream(body)
       else await sendSync(body)
     }
+
+    // ── Execution Plans dispatch (v2, multi-agent mode) ────────────────────
+    async function sendExecutionPlan(content) {
+      if (!planSteps.value.length) {
+        $q.notify({ type: 'warning', message: 'Add at least one step before running a multi-agent plan' })
+        thinking.value = false
+        return
+      }
+      try {
+        const steps = planSteps.value
+          .filter(s => (s.targetType === 'Agent' ? s.agentCode : s.teamCode))
+          .map(s => ({
+            ...(s.targetType === 'Agent' ? { agent_code: s.agentCode } : { team_code: s.teamCode }),
+            max_retries: s.maxRetries ?? 0
+          }))
+
+        const res = await executionPlansClient.run({
+          agentOs: agentOsCode.value,
+          message: content,
+          steps,
+          ...(sessionId.value && sessionId.value !== 'pending' ? { session_id: sessionId.value } : {}),
+          ...(userId.value ? { user_id: userId.value } : {})
+        })
+
+        if (res.disabled) {
+          executionPlansAvailable.value = false
+          multiAgentMode.value = false
+          messages.value.push({
+            id: Date.now().toString(), role: 'assistant',
+            content: 'Multi-agent mode (Execution Plans) is not enabled on this backend — switched back to normal chat.',
+            created_at: new Date()
+          })
+          $q.notify({ type: 'warning', message: 'Execution Plans not enabled here — multi-agent mode disabled' })
+          return
+        }
+
+        if (res.planRunId) lastPlanRunId.value = res.planRunId
+        if (res.session_id) sessionId.value = res.session_id
+        messages.value.push({
+          id: Date.now().toString(), role: 'assistant',
+          content: res.result || '(plan completed with no aggregated result)',
+          created_at: new Date()
+        })
+
+        // Best-effort step timeline — see execution-plans.client.js class note.
+        // A null result (endpoint not confirmed / not found) just means the
+        // Plan tab shows its empty state; it never blocks the chat response above.
+        planStepTimeline.value = res.planRunId ? await executionPlansClient.getStepTimeline(res.planRunId) : null
+        rightTab.value = 'plan'
+      } catch (e) {
+        const em = e.response?.data?.message || e.message
+        messages.value.push({ id: Date.now().toString(), role: 'assistant', content: `[error] ${em}`, created_at: new Date() })
+      } finally {
+        thinking.value = false
+        scrollBottom()
+      }
+    }
+
+    async function toggleMultiAgentMode() {
+      if (!executionPlansAvailable.value) return
+      multiAgentMode.value = !multiAgentMode.value
+      if (multiAgentMode.value && !planOptionsLoaded.value) {
+        // Lazy-loaded, global (not scoped to the currently selected team) —
+        // mirrors WorkflowsPage.vue's step-builder options exactly, since
+        // execution-plan steps address agents/teams by code the same way
+        // workflow steps do.
+        planOptionsLoaded.value = true
+        try {
+          const [agents, teams] = await Promise.all([
+            agnoClient.listAgents({ page_size: 100 }),
+            agnoClient.listTeams({ page_size: 100 })
+          ])
+          planAgentOptions.value = agents.items.map(a => ({ label: `${a.code} (${a.name})`, value: a.code }))
+          planTeamOptions.value = teams.items.map(t => ({ label: `${t.code} (${t.name})`, value: t.code }))
+        } catch {
+          $q.notify({ type: 'negative', message: 'Failed to load agents/teams for plan steps' })
+        }
+      }
+    }
+
+    function addPlanStep() {
+      planSteps.value.push({ targetType: 'Agent', agentCode: null, teamCode: null, maxRetries: 0 })
+    }
+    function removePlanStep(i) { planSteps.value.splice(i, 1) }
 
     async function sendSync(body) {
       try {
@@ -397,6 +607,49 @@ export default defineComponent({
         error: 'error_outline'
       }
       return map[uiStatus] || 'radio_button_checked'
+    }
+
+    // ── Action DSL dispatch ────────────────────────────────────────────────
+    // Runs a UIActionPlan received from the delivery-point stub above.
+    // Results (per-action ok/error/skipped) are logged into the existing
+    // Events timeline so failures are visible in the same place stream
+    // events already show up — no separate panel needed for this scope.
+    async function dispatchUIActionPlan(plan) {
+      const actionCount = plan?.actions?.length ?? 0
+      streamEvents.value.unshift({
+        id: `${Date.now()}-uiactions`,
+        agno_event: 'UIActionPlanReceived',
+        type: 'ui_action',
+        ui_status: 'ui_action_plan',
+        message: `Received UIActionPlan with ${actionCount} action(s)`,
+        detail: null,
+        payload: plan,
+        ts: new Date()
+      })
+
+      const results = await executeUIActionPlan(plan, { router })
+
+      const failed = results.filter(r => !r.ok)
+      results.forEach((r) => {
+        streamEvents.value.unshift({
+          id: `${Date.now()}-${Math.random()}`,
+          agno_event: `UIAction:${r.actionType}`,
+          type: 'ui_action',
+          ui_status: r.ok ? 'completed' : 'error',
+          message: r.ok ? `${r.actionType} → ${r.target}` : `${r.actionType} → ${r.target} FAILED: ${r.error}`,
+          detail: null,
+          payload: r,
+          ts: new Date()
+        })
+      })
+      if (streamEvents.value.length > 80) streamEvents.value = streamEvents.value.slice(0, 80)
+
+      if (failed.length) {
+        $q.notify({ type: 'warning', message: `${failed.length}/${results.length} UI action(s) failed — see Events tab` })
+      } else if (results.length) {
+        $q.notify({ type: 'positive', message: `Executed ${results.length} UI action(s)` })
+      }
+      rightTab.value = 'events'
     }
 
     async function sendStream(body) {
@@ -456,6 +709,16 @@ export default defineComponent({
             if (!raw) continue
             let payload
             try { payload = JSON.parse(raw) } catch { continue }
+
+            // ── v2 stub: UI Actions delivery point (Action DSL, brief §4) ────────
+            // The backend hasn't confirmed the exact delivery mechanism yet.
+            // Per the brief's own suggestion this checks `payload.uiActions`
+            // on each stream frame — once the backend confirms the real
+            // field/shape, this block is the ONLY thing that should need to
+            // change (dispatch itself is fully implemented in actionExecutor.js).
+            if (payload.uiActions) {
+              dispatchUIActionPlan(payload.uiActions)
+            }
 
             // ── Envelope ────────────────────────────────────────────────────────
             const d = payload.data || {}
@@ -631,13 +894,22 @@ export default defineComponent({
     const curlCopied = ref(false)
 
     function buildCurlBody(message = '<your message here>') {
+      // Mirrors send()'s body construction (incl. optional uiContext) so the
+      // generated snippet always matches what the app actually sends.
+      const uiContext = buildUiContext({
+        applicationId: agentOsCode.value || '<agentOs>',
+        pageId: 'ai-playground',
+        currentRecord: sessionId.value && sessionId.value !== 'pending' ? { sessionId: sessionId.value } : undefined,
+        variables: { team: teamCode.value || undefined, agent: agentCode.value || undefined }
+      })
       const body = {
         agentOs: agentOsCode.value || '<agentOs>',
         ...(teamCode.value ? { team: teamCode.value } : {}),
         ...(agentCode.value ? { agent: agentCode.value } : {}),
         message,
         ...(sessionId.value && sessionId.value !== 'pending' ? { session_id: sessionId.value } : {}),
-        ...(userId.value ? { user_id: userId.value } : {})
+        ...(userId.value ? { user_id: userId.value } : {}),
+        ...(uiContext ? { uiContext } : {})
       }
       return body
     }
@@ -678,7 +950,23 @@ export default defineComponent({
 
     onMounted(loadOptions)
 
-    return { agentOsCode, agentOsOptions, teamCode, teamOptions, agentCode, agentOptions, sessionId, lastRunId, userId, userInput, thinking, streamBuf, useStream, isCancelling, isStreaming, messages, streamEvents, sessionRuns, agentMemories, loadingMemory, rightTab, msgRef, textareaRef, panelTabs, dayjs, curlCopied, buildCurl, buildCancelCurl, copyCurl, toolEventIcon, loadOptions, loadTeams, loadAgents, startSession, send, loadRunEvents, loadMemory, autoResize, cancelStream }
+    // v2 — optional, fire-and-forget: push a PageOpened event into the same
+    // Runtime Events timeline the backend uses for agent-side events (see
+    // Observability page, Runtime Events tab). emitSafe() swallows all
+    // errors, so this is a no-op if the feature flag is off — it never
+    // affects the rest of this page.
+    onMounted(() => {
+      runtimeEventsClient.emitSafe({
+        entity_type: 'page',
+        entity_id: 'ai-playground',
+        event_name: 'PageOpened',
+        payload: { userId: userId.value || undefined }
+      })
+    })
+
+    return { agentOsCode, agentOsOptions, teamCode, teamOptions, agentCode, agentOptions, sessionId, lastRunId, userId, userInput, thinking, streamBuf, useStream, isCancelling, isStreaming, messages, streamEvents, sessionRuns, agentMemories, loadingMemory, rightTab, msgRef, textareaRef, highlightInput, panelTabs, dayjs, curlCopied, buildCurl, buildCancelCurl, copyCurl, toolEventIcon, loadOptions, loadTeams, loadAgents, startSession, send, loadRunEvents, loadMemory, autoResize, cancelStream,
+      multiAgentMode, executionPlansAvailable, planSteps, planAgentOptions, planTeamOptions, lastPlanRunId, planStepTimeline,
+      toggleMultiAgentMode, addPlanStep, removePlanStep }
   }
 })
 </script>
@@ -728,6 +1016,77 @@ export default defineComponent({
   font-family: var(--font-sans);
 
   &--active { background: var(--surface-raised); color: var(--text-primary); box-shadow: var(--shadow-xs); }
+}
+
+.play-multiagent-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-default);
+  background: var(--surface-raised);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 120ms ease;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+
+  &:hover { border-color: var(--brand-primary); color: var(--brand-primary); }
+
+  &--active {
+    background: var(--brand-primary-subtle);
+    border-color: var(--brand-primary);
+    color: var(--brand-primary);
+    font-weight: 600;
+  }
+}
+
+.plan-steps-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 20px;
+  background: var(--brand-primary-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+
+  &__label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--brand-primary);
+    flex-shrink: 0;
+  }
+}
+
+.plan-step-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px 3px 10px;
+  border-radius: 99px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+
+  &__order {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--brand-primary);
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
 }
 
 .play-body {
@@ -892,6 +1251,18 @@ export default defineComponent({
 
   &::placeholder { color: var(--text-quaternary); }
   &:disabled { cursor: not-allowed; opacity: 0.5; }
+
+  // Visual feedback for a HIGHLIGHT_COMPONENT Action DSL dispatch —
+  // applied to the wrapping .play-input-box via :has() where supported,
+  // with a direct outline fallback on the textarea itself.
+  &--highlighted {
+    animation: ui-action-highlight 1.5s ease;
+  }
+}
+
+@keyframes ui-action-highlight {
+  0%, 100% { box-shadow: none; }
+  15%, 45% { box-shadow: 0 0 0 2px var(--brand-primary); border-radius: 4px; }
 }
 
 .play-send-btn {
@@ -972,6 +1343,7 @@ export default defineComponent({
     border-bottom: 1px solid var(--border-subtle);
     padding: 0 8px;
     gap: 2px;
+    overflow: auto;
   }
 
   &__tab {
@@ -1131,6 +1503,7 @@ export default defineComponent({
   .play-ev--retrieving & { border-color: #3b82f6; background: #dbeafe; }
   .play-ev--completed & { border-color: #10b981; background: #d1fae5; }
   .play-ev--error & { border-color: #ef4444; background: #fee2e2; }
+  .play-ev--ui_action_plan & { border-color: #6366f1; background: #e0e7ff; }
 }
 
 .play-ev__body { flex: 1; min-width: 0; }

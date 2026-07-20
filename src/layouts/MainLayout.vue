@@ -64,6 +64,19 @@
             </router-link>
           </template>
 
+          <!-- Business Objects -->
+          <div v-if="!miniMode" class="sidenav__section-label" style="margin-top:16px">Business Objects</div>
+          <div v-if="miniMode" class="sidenav__mini-divider" />
+
+          <template v-for="item in businessObjectItems" :key="item.to">
+            <router-link class="sidenav__item" :class="{ 'is-active': $route.path.startsWith(item.to) }" :to="item.to">
+              <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
+              <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
+              <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
+                }}</q-tooltip>
+            </router-link>
+          </template>
+
           <!-- Operations -->
           <div v-if="!miniMode" class="sidenav__section-label" style="margin-top:16px">Operations</div>
           <div v-if="miniMode" class="sidenav__mini-divider" />
@@ -275,11 +288,21 @@ export default defineComponent({
       { label: 'Exec Logs', icon: 'receipt_long', to: '/mcp/logs' },
     ]
 
+    // v2 — Business Object Registry browser (read-only). New top-level
+    // section, separate from AI Platform / Knowledge, since business
+    // objects describe entities shared across agents/teams/forms rather
+    // than belonging to any one existing area.
+    const businessObjectItems = [
+      { label: 'Business Objects', icon: 'schema', to: '/business-objects' },
+    ]
+
     const opsItems = [
       { label: 'Events', icon: 'event_note', to: '/ops/events' },
       { label: 'Exec Logs', icon: 'receipt_long', to: '/ops/logs' },
       { label: 'Audit', icon: 'security', to: '/ops/audit' },
       { label: 'Monitoring', icon: 'monitor_heart', to: '/ops/monitoring' },
+      // v2 — Runtime Observations + Runtime Events (list + SSE tail + emit)
+      { label: 'Observability', icon: 'query_stats', to: '/ops/observability' },
     ]
 
     const systemItems = [
@@ -292,7 +315,7 @@ export default defineComponent({
     return {
       leftDrawerOpen, miniMode, uiStore, dayjs,
       userName, userEmail, userInitials,
-      aiItems, knowledgeItems, mcpItems, opsItems, systemItems,
+      aiItems, knowledgeItems, mcpItems, businessObjectItems, opsItems, systemItems,
       toggleDark, logout
     }
   }

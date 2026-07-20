@@ -76,7 +76,7 @@ export default defineComponent({
       // Try JSON parse for object-typed fields; fall back to raw string
       const prop = schemaProps.value[key]
       if (prop?.type === 'object') {
-        try { update(key, JSON.parse(raw)) } catch { update(key, raw) }
+        try { update(key, raw) } catch { update(key, raw) }
       } else {
         update(key, raw)
       }
