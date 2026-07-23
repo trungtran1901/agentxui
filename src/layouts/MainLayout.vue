@@ -76,7 +76,18 @@
                 }}</q-tooltip>
             </router-link>
           </template>
+          <!-- UI Metadata (NEW) -->
+          <div v-if="!miniMode" class="sidenav__section-label" style="margin-top:16px">UI Metadata</div>
+          <div v-if="miniMode" class="sidenav__mini-divider" />
 
+          <template v-for="item in uiMetadataItems" :key="item.to">
+            <router-link class="sidenav__item" :class="{ 'is-active': $route.path.startsWith(item.to) }" :to="item.to">
+              <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
+              <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
+              <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
+              }}</q-tooltip>
+            </router-link>
+          </template>
           <!-- Operations -->
           <div v-if="!miniMode" class="sidenav__section-label" style="margin-top:16px">Operations</div>
           <div v-if="miniMode" class="sidenav__mini-divider" />
@@ -295,7 +306,9 @@ export default defineComponent({
     const businessObjectItems = [
       { label: 'Business Objects', icon: 'schema', to: '/business-objects' },
     ]
-
+    const uiMetadataItems = [
+      { label: 'UI Metadata', icon: 'dashboard_customize', to: '/ui-metadata' },
+    ]
     const opsItems = [
       { label: 'Events', icon: 'event_note', to: '/ops/events' },
       { label: 'Exec Logs', icon: 'receipt_long', to: '/ops/logs' },
@@ -315,7 +328,7 @@ export default defineComponent({
     return {
       leftDrawerOpen, miniMode, uiStore, dayjs,
       userName, userEmail, userInitials,
-      aiItems, knowledgeItems, mcpItems, businessObjectItems, opsItems, systemItems,
+      aiItems, knowledgeItems, mcpItems, businessObjectItems, opsItems, systemItems, uiMetadataItems,
       toggleDark, logout
     }
   }

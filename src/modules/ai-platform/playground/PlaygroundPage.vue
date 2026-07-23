@@ -11,24 +11,27 @@
       <div style="display:flex;align-items:center;gap:8px;flex:1;justify-content:center">
         <div class="play-select-group">
           <q-select v-model="agentOsCode" :options="agentOsOptions" outlined dense clearable emit-value map-options
-            label="AgentOS *" style="width:180px" @update:model-value="teamCode=null;agentCode=null;loadTeams()" />
+            label="AgentOS *" style="width:180px"
+            @update:model-value="teamCode = null; agentCode = null; loadTeams()" />
           <q-select v-model="teamCode" :options="teamOptions" outlined dense clearable emit-value map-options
-            label="Team" style="width:155px" :disable="!agentOsCode" @update:model-value="agentCode=null;loadAgents()" />
+            label="Team" style="width:155px" :disable="!agentOsCode"
+            @update:model-value="agentCode = null; loadAgents()" />
           <q-select v-model="agentCode" :options="agentOptions" outlined dense clearable emit-value map-options
             label="Agent" style="width:175px" :disable="!agentOsCode" />
         </div>
         <div class="play-toolbar__divider" />
         <div class="play-mode-toggle" v-if="!multiAgentMode">
-          <button :class="['play-mode-btn', !useStream && 'play-mode-btn--active']" @click="useStream=false">Sync</button>
-          <button :class="['play-mode-btn', useStream && 'play-mode-btn--active']" @click="useStream=true">Stream</button>
+          <button :class="['play-mode-btn', !useStream && 'play-mode-btn--active']"
+            @click="useStream = false">Sync</button>
+          <button :class="['play-mode-btn', useStream && 'play-mode-btn--active']"
+            @click="useStream = true">Stream</button>
         </div>
         <span v-else class="code-tag" style="font-size:10px">streaming n/a in multi-agent mode</span>
 
         <!-- v2 — advanced / multi-agent mode toggle (POST /execution-plans/run).
              Additive: chat behaves exactly as before when this is off. -->
-        <button v-if="executionPlansAvailable"
-          class="play-multiagent-toggle" :class="multiAgentMode && 'play-multiagent-toggle--active'"
-          @click="toggleMultiAgentMode"
+        <button v-if="executionPlansAvailable" class="play-multiagent-toggle"
+          :class="multiAgentMode && 'play-multiagent-toggle--active'" @click="toggleMultiAgentMode"
           title="Advanced: run an ordered multi-agent execution plan instead of single-turn chat">
           <q-icon name="route" size="13px" />
           Multi-agent
@@ -36,8 +39,8 @@
       </div>
 
       <div style="display:flex;align-items:center;gap:8px">
-        <span v-if="sessionId && sessionId!=='pending'" class="code-tag" style="font-size:10px">
-          sid: {{ sessionId.substring(0,10) }}…
+        <span v-if="sessionId && sessionId !== 'pending'" class="code-tag" style="font-size:10px">
+          sid: {{ sessionId.substring(0, 10) }}…
         </span>
         <button class="btn btn--primary btn--sm" :disabled="!agentOsCode" @click="startSession">
           <q-icon name="add" size="14px" />
@@ -56,12 +59,12 @@
 
       <div v-for="(s, i) in planSteps" :key="i" class="plan-step-chip">
         <span class="plan-step-chip__order">{{ i + 1 }}</span>
-        <q-select v-model="s.targetType" :options="['Agent','Team']" dense borderless
-          style="width:66px" @update:model-value="s.agentCode=null; s.teamCode=null" />
-        <q-select v-if="s.targetType === 'Agent'" v-model="s.agentCode" :options="planAgentOptions"
-          dense borderless emit-value map-options placeholder="agent_code" style="width:170px" />
-        <q-select v-else v-model="s.teamCode" :options="planTeamOptions"
-          dense borderless emit-value map-options placeholder="team_code" style="width:170px" />
+        <q-select v-model="s.targetType" :options="['Agent', 'Team']" dense borderless style="width:66px"
+          @update:model-value="s.agentCode = null; s.teamCode = null" />
+        <q-select v-if="s.targetType === 'Agent'" v-model="s.agentCode" :options="planAgentOptions" dense borderless
+          emit-value map-options placeholder="agent_code" style="width:170px" />
+        <q-select v-else v-model="s.teamCode" :options="planTeamOptions" dense borderless emit-value map-options
+          placeholder="team_code" style="width:170px" />
         <q-input v-model.number="s.maxRetries" dense borderless type="number" min="0" style="width:46px"
           title="max_retries" />
         <button class="btn btn--ghost btn--icon-sm" @click="removePlanStep(i)" title="Remove step">
@@ -80,7 +83,7 @@
 
     <div class="play-body">
       <!-- Chat panel -->
-      <div class="play-chat">
+      <div class="play-chat" @dragover.prevent @drop.prevent="onDrop">
         <!-- Messages -->
         <div ref="msgRef" class="play-messages">
           <!-- Empty state -->
@@ -103,7 +106,8 @@
           <template v-for="msg in messages" :key="msg.id">
 
             <!-- Tool call / status block (inline, between messages) -->
-            <div v-if="msg.role==='tool_event'" class="play-tool-event anim-fade" :class="`play-tool-event--${msg.ui_status}`">
+            <div v-if="msg.role === 'tool_event'" class="play-tool-event anim-fade"
+              :class="`play-tool-event--${msg.ui_status}`">
               <div class="play-tool-event__icon">
                 <q-icon :name="toolEventIcon(msg.ui_status)" size="13px" />
               </div>
@@ -111,17 +115,22 @@
                 <span class="play-tool-event__label">{{ msg.label }}</span>
                 <span v-if="msg.agno_event" class="play-tool-event__tag">{{ msg.agno_event }}</span>
               </div>
-              <div v-if="msg.ui_status==='tool_call'" class="play-tool-event__dots">
-                <span/><span/><span/>
+              <div v-if="msg.ui_status === 'tool_call'" class="play-tool-event__dots">
+                <span /><span /><span />
               </div>
             </div>
 
             <!-- Regular chat bubble -->
             <div v-else class="play-msg" :class="`play-msg--${msg.role}`">
               <div class="play-msg__avatar" :class="`play-msg__avatar--${msg.role}`">
-                <q-icon :name="msg.role==='user'?'person':'smart_toy'" size="14px" />
+                <q-icon :name="msg.role === 'user' ? 'person' : 'smart_toy'" size="14px" />
               </div>
               <div class="play-msg__content">
+                <div v-if="msg.attachments?.length" class="play-msg__attachments">
+                  <span v-for="f in msg.attachments" :key="f.id" class="play-msg__attach-tag">
+                    <q-icon :name="f.icon" size="12px" />{{ f.name }}
+                  </span>
+                </div>
                 <div class="play-msg__bubble"
                   :class="[`play-msg__bubble--${msg.role}`, msg.cancelled && 'play-msg__bubble--cancelled']">
                   <span style="white-space:pre-wrap">{{ msg.content }}</span>
@@ -166,25 +175,41 @@
 
         <!-- Input -->
         <div class="play-input-area">
+          <div v-if="attachments.items.value.length" class="play-attach-bar">
+            <div v-for="a in attachments.items.value" :key="a.tempId" class="play-attach-chip"
+              :class="`play-attach-chip--${a.status}`">
+              <q-icon :name="a.icon" size="14px" />
+              <span class="play-attach-chip__name">{{ a.name }}</span>
+              <q-spinner v-if="a.status === 'uploading'" size="12px" />
+              <q-icon v-else-if="a.status === 'ready'" name="check_circle" size="13px"
+                style="color:var(--brand-secondary)" />
+              <q-icon v-else name="error_outline" size="13px" style="color:var(--brand-danger)">
+                <q-tooltip>{{ a.errorMessage }}</q-tooltip>
+              </q-icon>
+              <button v-if="a.status === 'error'" class="play-attach-chip__retry" @click="attachments.retry(a.tempId)"
+                title="Thử lại">
+                <q-icon name="refresh" size="12px" />
+              </button>
+              <button class="play-attach-chip__remove" @click="attachments.remove(a.tempId)">
+                <q-icon name="close" size="12px" />
+              </button>
+            </div>
+          </div>
           <div class="play-input-box">
-            <textarea
-              v-model="userInput"
-              class="play-textarea"
+            <input ref="fileInputRef" type="file" multiple style="display:none"
+              accept=".jpg,.jpeg,.png,.pdf,.docx,.xlsx" @change="onFilePick" />
+            <button class="play-attach-btn" title="Đính kèm file" @click="fileInputRef.click()">
+              <q-icon name="attach_file" size="18px" />
+            </button>
+            <textarea v-model="userInput" class="play-textarea"
               :class="{ 'play-textarea--highlighted': highlightInput }"
               :placeholder="sessionId ? 'Type a message… (Enter to send, Shift+Enter for newline)' : 'Start a session first…'"
-              :disabled="!sessionId || thinking"
-              rows="1"
-              @keydown.enter.exact.prevent="send"
-              @input="autoResize"
-              ref="textareaRef"
-            />
+              :disabled="!sessionId || thinking" rows="1" @keydown.enter.exact.prevent="send" @input="autoResize"
+              ref="textareaRef" />
 
             <!-- Stop button — only in stream mode while streaming -->
-            <button v-if="useStream && isStreaming"
-              class="play-stop-btn"
-              :class="{ 'play-stop-btn--cancelling': isCancelling }"
-              :disabled="isCancelling"
-              @click="cancelStream"
+            <button v-if="useStream && isStreaming" class="play-stop-btn"
+              :class="{ 'play-stop-btn--cancelling': isCancelling }" :disabled="isCancelling" @click="cancelStream"
               title="Stop generation (POST /runs/{id}/cancel)">
               <q-spinner v-if="isCancelling" size="14px" style="color:var(--brand-danger)" />
               <template v-else>
@@ -193,9 +218,8 @@
             </button>
 
             <!-- Send button — hidden while streaming -->
-            <button v-else
-              class="play-send-btn"
-              :disabled="!userInput.trim()||!sessionId||thinking"
+            <button v-else class="play-send-btn"
+              :disabled="(!userInput.trim() && !attachments.readySnapshot().length) || !sessionId || thinking || attachments.hasUploading()"
               @click="send">
               <q-icon name="arrow_upward" size="18px" />
             </button>
@@ -203,7 +227,7 @@
           <div class="play-input-meta">
             <span>{{ useStream ? 'POST /chat/stream (SSE events)' : 'POST /chat (synchronous)' }}</span>
             <span v-if="lastRunId">
-              · run: {{ lastRunId.substring(0,12) }}…
+              · run: {{ lastRunId.substring(0, 12) }}…
               <template v-if="useStream && isStreaming">
                 · <span style="color:var(--brand-secondary);font-weight:600">streaming</span>
               </template>
@@ -216,8 +240,7 @@
       <div class="play-panel">
         <div class="play-panel__tabs">
           <button v-for="t in panelTabs" :key="t.key"
-            :class="['play-panel__tab', rightTab===t.key && 'play-panel__tab--active']"
-            @click="rightTab=t.key">
+            :class="['play-panel__tab', rightTab === t.key && 'play-panel__tab--active']" @click="rightTab = t.key">
             <q-icon :name="t.icon" size="14px" />
             {{ t.label }}
           </button>
@@ -225,14 +248,15 @@
 
         <div class="play-panel__body">
           <!-- Events -->
-          <div v-show="rightTab==='events'">
+          <div v-show="rightTab === 'events'">
             <div v-if="!streamEvents.length" class="empty-state" style="padding:40px 16px">
               <div class="empty-state__icon"><q-icon name="event_note" /></div>
               <div class="empty-state__title">No events</div>
               <div class="empty-state__desc">AG-UI events from Agno appear here during streaming</div>
             </div>
             <div class="play-event-timeline">
-              <div v-for="ev in streamEvents" :key="ev.id" class="play-ev anim-fade" :class="`play-ev--${ev.ui_status||'default'}`">
+              <div v-for="ev in streamEvents" :key="ev.id" class="play-ev anim-fade"
+                :class="`play-ev--${ev.ui_status || 'default'}`">
                 <div class="play-ev__dot" />
                 <div class="play-ev__body">
                   <div class="play-ev__head">
@@ -247,22 +271,25 @@
           </div>
 
           <!-- Runs -->
-          <div v-show="rightTab==='runs'">
+          <div v-show="rightTab === 'runs'">
             <div v-if="!sessionRuns.length" class="empty-state" style="padding:40px 16px">
               <div class="empty-state__icon"><q-icon name="history" /></div>
               <div class="empty-state__title">No runs yet</div>
             </div>
             <div v-for="r in sessionRuns" :key="r.id" class="play-run" @click="loadRunEvents(r.id)">
-              <span class="badge" :class="r.status==='completed'?'badge--active':'badge--pending'">{{ r.status }}</span>
-              <span class="font-mono" style="font-size:10px;color:var(--text-tertiary);flex:1">{{ r.id.substring(0,16) }}…</span>
+              <span class="badge" :class="r.status === 'completed' ? 'badge--active' : 'badge--pending'">{{ r.status
+              }}</span>
+              <span class="font-mono" style="font-size:10px;color:var(--text-tertiary);flex:1">{{ r.id.substring(0, 16)
+                }}…</span>
               <span style="font-size:10px;color:var(--text-quaternary)">{{ dayjs(r.created_at).format('HH:mm') }}</span>
             </div>
           </div>
 
           <!-- Memory -->
-          <div v-show="rightTab==='memory'">
+          <div v-show="rightTab === 'memory'">
             <div style="padding:8px">
-              <button class="btn btn--secondary btn--sm" style="width:100%;margin-bottom:8px" @click="loadMemory" :disabled="loadingMemory">
+              <button class="btn btn--secondary btn--sm" style="width:100%;margin-bottom:8px" @click="loadMemory"
+                :disabled="loadingMemory">
                 <q-spinner v-if="loadingMemory" size="12px" />
                 <span>{{ loadingMemory ? 'Loading…' : 'Load Memory' }}</span>
               </button>
@@ -274,41 +301,47 @@
             </div>
             <div v-for="m in agentMemories" :key="m.id" class="play-memory">
               <div style="font-size:12px;line-height:1.6;color:var(--text-primary)">{{ m.content }}</div>
-              <div style="font-size:10px;color:var(--text-quaternary);margin-top:4px">{{ dayjs(m.created_at).format('YYYY-MM-DD HH:mm') }}</div>
+              <div style="font-size:10px;color:var(--text-quaternary);margin-top:4px">{{
+                dayjs(m.created_at).format('YYYY-MM-DD HH:mm') }}</div>
             </div>
           </div>
 
           <!-- Plan (v2 — Execution Plans step timeline) -->
-          <div v-show="rightTab==='plan'">
+          <div v-show="rightTab === 'plan'">
             <div v-if="!lastPlanRunId" class="empty-state" style="padding:40px 16px">
               <div class="empty-state__icon"><q-icon name="route" /></div>
               <div class="empty-state__title">No plan run yet</div>
-              <div class="empty-state__desc">Turn on Multi-agent mode, add steps, and send a message to run a POST /execution-plans/run.</div>
+              <div class="empty-state__desc">Turn on Multi-agent mode, add steps, and send a message to run a POST
+                /execution-plans/run.</div>
             </div>
             <template v-else>
               <div style="padding:10px 8px 4px">
-                <span class="code-tag" style="font-size:10px">planRunId: {{ lastPlanRunId.substring(0,18) }}…</span>
+                <span class="code-tag" style="font-size:10px">planRunId: {{ lastPlanRunId.substring(0, 18) }}…</span>
               </div>
               <div v-if="!planStepTimeline" class="empty-state" style="padding:32px 16px">
                 <div class="empty-state__icon"><q-icon name="hourglass_empty" /></div>
                 <div class="empty-state__title">Step timeline not available</div>
                 <div class="empty-state__desc">
                   The aggregated result above already reflects the completed run. A per-step timeline endpoint
-                  wasn't confirmed in the v2 API reference — this panel will populate automatically once one is available.
+                  wasn't confirmed in the v2 API reference — this panel will populate automatically once one is
+                  available.
                 </div>
               </div>
-              <pre v-else class="code-block" style="margin:8px;font-size:11px">{{ JSON.stringify(planStepTimeline, null, 2) }}</pre>
+              <pre v-else class="code-block"
+                style="margin:8px;font-size:11px">{{ JSON.stringify(planStepTimeline, null, 2) }}</pre>
             </template>
           </div>
           <!-- cURL -->
-          <div v-show="rightTab==='curl'" class="play-curl">
+          <div v-show="rightTab === 'curl'" class="play-curl">
             <div class="play-curl__header">
               <div class="play-curl__title">
                 <q-icon name="code" size="14px" style="color:var(--brand-primary)" />
                 <span>cURL Request</span>
-                <span class="badge badge--running badge--no-dot" style="font-size:10px">{{ useStream ? 'STREAM' : 'SYNC' }}</span>
+                <span class="badge badge--running badge--no-dot" style="font-size:10px">{{ useStream ? 'STREAM' : 'SYNC'
+                  }}</span>
               </div>
-              <button class="play-curl__copy-btn" :class="curlCopied && 'play-curl__copy-btn--copied'" @click="copyCurl">
+              <button class="play-curl__copy-btn" :class="curlCopied && 'play-curl__copy-btn--copied'"
+                @click="copyCurl">
                 <q-icon :name="curlCopied ? 'check' : 'content_copy'" size="13px" />
                 {{ curlCopied ? 'Copied!' : 'Copy' }}
               </button>
@@ -350,7 +383,7 @@ import { executeUIActionPlan } from '../../../services/ui/actionExecutor.js'
 import { runtimeEventsClient } from '../../../services/api/runtime-events.client.js'
 import { executionPlansClient } from '../../../services/api/execution-plans.client.js'
 import dayjs from 'dayjs'
-
+import { useChatAttachments } from '../../../composables/useChatAttachments.js'
 export default defineComponent({
   name: 'PlaygroundPage',
   setup() {
@@ -372,6 +405,23 @@ export default defineComponent({
     const messages = ref([]), streamEvents = ref([]), sessionRuns = ref([])
     const agentMemories = ref([]), loadingMemory = ref(false)
     const rightTab = ref('events'), msgRef = ref(null), textareaRef = ref(null)
+    const fileInputRef = ref(null)
+    const attachments = useChatAttachments({
+      getSessionId: () => sessionId.value,
+      getUserId: () => userId.value
+    })
+
+    function onFilePick(e) {
+      attachments.addFiles(e.target.files)
+      e.target.value = '' // cho phép chọn lại cùng file
+    }
+    function onDrop(e) {
+      if (e.dataTransfer?.files?.length) attachments.addFiles(e.dataTransfer.files)
+    }
+    function onPaste(e) {
+      const files = Array.from(e.clipboardData?.files || [])
+      if (files.length) { attachments.addFiles(files); e.preventDefault() }
+    }
     // userId from Keycloak sub claim
     const userId = ref(keycloakService.getUserId() || '')
 
@@ -422,7 +472,7 @@ export default defineComponent({
       try {
         const r = await agnoClient.listAgentOS({ page_size: 100 })
         agentOsOptions.value = r.items.map(a => ({ label: a.name, value: a.code }))
-      } catch {}
+      } catch { }
     }
 
     async function loadTeams() {
@@ -437,7 +487,7 @@ export default defineComponent({
         const r = await agnoClient.listTeams({ agent_os_id: os.id, page_size: 100 })
         teamsRaw.value = r.items
         teamOptions.value = r.items.map(t => ({ label: t.name, value: t.code }))
-      } catch {}
+      } catch { }
     }
 
     async function loadAgents() {
@@ -449,7 +499,7 @@ export default defineComponent({
         const r = await agnoClient.listAgents({ team_id: team.id, page_size: 100 })
         agentsRaw.value = r.items
         agentOptions.value = r.items.map(a => ({ label: a.name, value: a.code }))
-      } catch {}
+      } catch { }
     }
 
     function startSession() {
@@ -460,31 +510,23 @@ export default defineComponent({
 
     async function send() {
       const content = userInput.value.trim()
-      if (!content || !sessionId.value || !agentOsCode.value) return
-      userInput.value = ''
-      if (textareaRef.value) textareaRef.value.style.height = 'auto'
-      messages.value.push({ id: Date.now().toString(), role: 'user', content, created_at: new Date() })
-      scrollBottom(); thinking.value = true
-
-      // v2 — "advanced / multi-agent mode": an alternative dispatch path,
-      // not a replacement for the chat flow below. Early-return keeps the
-      // normal single-turn body/uiContext construction and sendSync/
-      // sendStream untouched when this toggle is off (the default).
-      if (multiAgentMode.value) {
-        await sendExecutionPlan(content)
+      if ((!content && !attachments.readyIds().length) || !sessionId.value || !agentOsCode.value) return
+      if (attachments.hasUploading()) {
+        $q.notify({ type: 'warning', message: 'Vui lòng chờ file tải lên xong trước khi gửi' })
         return
       }
+      userInput.value = ''
+      if (textareaRef.value) textareaRef.value.style.height = 'auto'
 
-      // POST /chat body contract: agentOs, team, agent (optional), message, session_id, user_id
-      // uiContext (v2, optional/additive): only attached when non-empty — see
-      // buildUiContext(). Omitting it entirely preserves pre-v2 behavior.
-      const uiContext = buildUiContext({
-        applicationId: agentOsCode.value || undefined,
-        pageId: 'ai-playground',
-        currentRecord: sessionId.value && sessionId.value !== 'pending' ? { sessionId: sessionId.value } : undefined,
-        variables: { team: teamCode.value || undefined, agent: agentCode.value || undefined }
+      const attachSnapshot = attachments.readySnapshot()
+      messages.value.push({
+        id: Date.now().toString(), role: 'user', content,
+        created_at: new Date(),
+        ...(attachSnapshot.length ? { attachments: attachSnapshot } : {})
       })
+      scrollBottom(); thinking.value = true
 
+      const attachIds = attachments.readyIds()
       const body = {
         agentOs: agentOsCode.value,
         ...(teamCode.value ? { team: teamCode.value } : {}),
@@ -492,8 +534,9 @@ export default defineComponent({
         message: content,
         ...(sessionId.value !== 'pending' ? { session_id: sessionId.value } : {}),
         ...(userId.value ? { user_id: userId.value } : {}),
-        ...(uiContext ? { uiContext } : {})
+        ...(attachIds.length ? { uiContext: { attachments: attachIds } } : {})
       }
+      attachments.reset()
 
       if (useStream.value) await sendStream(body)
       else await sendSync(body)
@@ -829,7 +872,7 @@ export default defineComponent({
         const evs = await agnoClient.getRunEvents(runId)
         streamEvents.value = evs.map(e => ({ id: e.id, type: e.type, payload: e.payload, ts: new Date(e.created_at) }))
         rightTab.value = 'events'
-      } catch {}
+      } catch { }
     }
 
     async function loadMemory() {
@@ -859,7 +902,7 @@ export default defineComponent({
 
       // 2. Client-side: close the SSE reader so the while loop exits
       if (activeReader) {
-        try { await activeReader.cancel() } catch {}
+        try { await activeReader.cancel() } catch { }
       }
 
       // 3. Flush partial buffer as a truncated message
@@ -964,9 +1007,11 @@ export default defineComponent({
       })
     })
 
-    return { agentOsCode, agentOsOptions, teamCode, teamOptions, agentCode, agentOptions, sessionId, lastRunId, userId, userInput, thinking, streamBuf, useStream, isCancelling, isStreaming, messages, streamEvents, sessionRuns, agentMemories, loadingMemory, rightTab, msgRef, textareaRef, highlightInput, panelTabs, dayjs, curlCopied, buildCurl, buildCancelCurl, copyCurl, toolEventIcon, loadOptions, loadTeams, loadAgents, startSession, send, loadRunEvents, loadMemory, autoResize, cancelStream,
+    return {
+      agentOsCode, agentOsOptions, teamCode, teamOptions, agentCode, agentOptions, sessionId, lastRunId, userId, userInput, thinking, streamBuf, useStream, isCancelling, isStreaming, messages, streamEvents, sessionRuns, agentMemories, loadingMemory, rightTab, msgRef, textareaRef, highlightInput, panelTabs, dayjs, curlCopied, buildCurl, buildCancelCurl, copyCurl, toolEventIcon, loadOptions, loadTeams, loadAgents, startSession, send, loadRunEvents, loadMemory, autoResize, cancelStream,
       multiAgentMode, executionPlansAvailable, planSteps, planAgentOptions, planTeamOptions, lastPlanRunId, planStepTimeline,
-      toggleMultiAgentMode, addPlanStep, removePlanStep }
+      toggleMultiAgentMode, addPlanStep, removePlanStep, fileInputRef, attachments, onFilePick, onDrop, onPaste,
+    }
   }
 })
 </script>
@@ -990,10 +1035,18 @@ export default defineComponent({
   gap: 16px;
   flex-shrink: 0;
 
-  &__divider { width: 1px; height: 20px; background: var(--border-subtle); }
+  &__divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border-subtle);
+  }
 }
 
-.play-select-group { display: flex; align-items: center; gap: 6px; }
+.play-select-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 
 .play-mode-toggle {
   display: flex;
@@ -1015,7 +1068,11 @@ export default defineComponent({
   transition: all 120ms ease;
   font-family: var(--font-sans);
 
-  &--active { background: var(--surface-raised); color: var(--text-primary); box-shadow: var(--shadow-xs); }
+  &--active {
+    background: var(--surface-raised);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-xs);
+  }
 }
 
 .play-multiagent-toggle {
@@ -1034,7 +1091,10 @@ export default defineComponent({
   font-family: var(--font-sans);
   white-space: nowrap;
 
-  &:hover { border-color: var(--brand-primary); color: var(--brand-primary); }
+  &:hover {
+    border-color: var(--brand-primary);
+    color: var(--brand-primary);
+  }
 
   &--active {
     background: var(--brand-primary-subtle);
@@ -1111,8 +1171,14 @@ export default defineComponent({
   flex-direction: column;
   gap: 16px;
 
-  &::-webkit-scrollbar { width: 4px; }
-  &::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 2px; }
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--border-subtle);
+    border-radius: 2px;
+  }
 }
 
 .play-empty {
@@ -1135,9 +1201,29 @@ export default defineComponent({
     margin-bottom: 16px;
   }
 
-  &__title { font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
-  &__desc { font-size: 13px; color: var(--text-tertiary); line-height: 1.6; max-width: 360px; }
-  &__user { margin-top: 12px; font-size: 11px; color: var(--text-quaternary); font-family: var(--font-mono); display: flex; align-items: center; gap: 4px; }
+  &__title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  &__desc {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    line-height: 1.6;
+    max-width: 360px;
+  }
+
+  &__user {
+    margin-top: 12px;
+    font-size: 11px;
+    color: var(--text-quaternary);
+    font-family: var(--font-mono);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
 }
 
 .play-msg {
@@ -1145,8 +1231,14 @@ export default defineComponent({
   gap: 10px;
   max-width: 85%;
 
-  &--user { align-self: flex-end; flex-direction: row-reverse; }
-  &--assistant { align-self: flex-start; }
+  &--user {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+  }
+
+  &--assistant {
+    align-self: flex-start;
+  }
 
   &__avatar {
     width: 28px;
@@ -1157,11 +1249,23 @@ export default defineComponent({
     justify-content: center;
     flex-shrink: 0;
 
-    &--user { background: var(--brand-primary); color: white; }
-    &--assistant { background: var(--surface-sunken); color: var(--text-tertiary); border: 1px solid var(--border-subtle); }
+    &--user {
+      background: var(--brand-primary);
+      color: white;
+    }
+
+    &--assistant {
+      background: var(--surface-sunken);
+      color: var(--text-tertiary);
+      border: 1px solid var(--border-subtle);
+    }
   }
 
-  &__content { display: flex; flex-direction: column; gap: 4px; }
+  &__content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
 
   &__bubble {
     padding: 10px 14px;
@@ -1183,7 +1287,11 @@ export default defineComponent({
     }
   }
 
-  &__meta { font-size: 10px; color: var(--text-quaternary); padding: 0 2px; }
+  &__meta {
+    font-size: 10px;
+    color: var(--text-quaternary);
+    padding: 0 2px;
+  }
 }
 
 .play-thinking {
@@ -1199,14 +1307,29 @@ export default defineComponent({
     background: var(--text-quaternary);
     animation: thinking 1.2s ease infinite;
 
-    &:nth-child(2) { animation-delay: 0.2s; }
-    &:nth-child(3) { animation-delay: 0.4s; }
+    &:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    &:nth-child(3) {
+      animation-delay: 0.4s;
+    }
   }
 }
 
 @keyframes thinking {
-  0%, 80%, 100% { transform: scale(0.7); opacity: 0.4; }
-  40% { transform: scale(1); opacity: 1; }
+
+  0%,
+  80%,
+  100% {
+    transform: scale(0.7);
+    opacity: 0.4;
+  }
+
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .play-cursor {
@@ -1233,7 +1356,10 @@ export default defineComponent({
   padding: 10px 10px 10px 14px;
   transition: border-color 150ms ease;
 
-  &:focus-within { border-color: var(--brand-primary); box-shadow: var(--shadow-focus); }
+  &:focus-within {
+    border-color: var(--brand-primary);
+    box-shadow: var(--shadow-focus);
+  }
 }
 
 .play-textarea {
@@ -1249,8 +1375,14 @@ export default defineComponent({
   max-height: 160px;
   overflow-y: auto;
 
-  &::placeholder { color: var(--text-quaternary); }
-  &:disabled { cursor: not-allowed; opacity: 0.5; }
+  &::placeholder {
+    color: var(--text-quaternary);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
 
   // Visual feedback for a HIGHLIGHT_COMPONENT Action DSL dispatch —
   // applied to the wrapping .play-input-box via :has() where supported,
@@ -1261,8 +1393,17 @@ export default defineComponent({
 }
 
 @keyframes ui-action-highlight {
-  0%, 100% { box-shadow: none; }
-  15%, 45% { box-shadow: 0 0 0 2px var(--brand-primary); border-radius: 4px; }
+
+  0%,
+  100% {
+    box-shadow: none;
+  }
+
+  15%,
+  45% {
+    box-shadow: 0 0 0 2px var(--brand-primary);
+    border-radius: 4px;
+  }
 }
 
 .play-send-btn {
@@ -1279,8 +1420,14 @@ export default defineComponent({
   flex-shrink: 0;
   transition: all 120ms ease;
 
-  &:disabled { background: var(--border-default); cursor: not-allowed; }
-  &:not(:disabled):hover { background: var(--brand-primary-hover); }
+  &:disabled {
+    background: var(--border-default);
+    cursor: not-allowed;
+  }
+
+  &:not(:disabled):hover {
+    background: var(--brand-primary-hover);
+  }
 }
 
 .play-stop-btn {
@@ -1288,7 +1435,7 @@ export default defineComponent({
   height: 34px;
   border-radius: 8px;
   background: var(--status-error-bg);
-  border: 1.5px solid rgba(239,68,68,0.3);
+  border: 1.5px solid rgba(239, 68, 68, 0.3);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1300,10 +1447,16 @@ export default defineComponent({
   &:hover:not(:disabled) {
     background: var(--brand-danger);
     border-color: var(--brand-danger);
-    .play-stop-btn__square { background: white; }
+
+    .play-stop-btn__square {
+      background: white;
+    }
   }
 
-  &:disabled { opacity: 0.6; cursor: not-allowed; }
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 
   &--cancelling {
     background: var(--surface-sunken);
@@ -1362,8 +1515,14 @@ export default defineComponent({
     margin-bottom: -1px;
     font-family: var(--font-sans);
 
-    &--active { color: var(--brand-primary); border-bottom-color: var(--brand-primary); }
-    &:hover:not(.play-panel__tab--active) { color: var(--text-primary); }
+    &--active {
+      color: var(--brand-primary);
+      border-bottom-color: var(--brand-primary);
+    }
+
+    &:hover:not(.play-panel__tab--active) {
+      color: var(--text-primary);
+    }
   }
 
   &__body {
@@ -1371,8 +1530,14 @@ export default defineComponent({
     overflow-y: auto;
     padding: 8px;
 
-    &::-webkit-scrollbar { width: 3px; }
-    &::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 2px; }
+    &::-webkit-scrollbar {
+      width: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--border-subtle);
+      border-radius: 2px;
+    }
   }
 }
 
@@ -1395,22 +1560,26 @@ export default defineComponent({
     border-color: rgba(251, 191, 36, 0.25);
     color: #92400e;
   }
+
   &--thinking {
     background: rgba(139, 92, 246, 0.06);
     border-color: rgba(139, 92, 246, 0.2);
     color: #5b21b6;
   }
+
   &--retrieving {
     background: rgba(59, 130, 246, 0.06);
     border-color: rgba(59, 130, 246, 0.2);
     color: #1e40af;
   }
+
   &--completed {
     background: rgba(16, 185, 129, 0.06);
     border-color: rgba(16, 185, 129, 0.2);
     color: #065f46;
     opacity: 0.7;
   }
+
   &--default {
     background: var(--surface-overlay);
     border-color: var(--border-subtle);
@@ -1442,7 +1611,7 @@ export default defineComponent({
 .play-tool-event__tag {
   font-size: 10px;
   font-family: var(--font-mono);
-  background: rgba(0,0,0,0.06);
+  background: rgba(0, 0, 0, 0.06);
   border-radius: 4px;
   padding: 1px 5px;
   flex-shrink: 0;
@@ -1460,8 +1629,14 @@ export default defineComponent({
     background: currentColor;
     opacity: 0.6;
     animation: thinking 1.2s ease infinite;
-    &:nth-child(2) { animation-delay: 0.2s; }
-    &:nth-child(3) { animation-delay: 0.4s; }
+
+    &:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    &:nth-child(3) {
+      animation-delay: 0.4s;
+    }
   }
 }
 
@@ -1498,15 +1673,41 @@ export default defineComponent({
   flex-shrink: 0;
   margin-top: 4px;
 
-  .play-ev--tool_call & { border-color: #f59e0b; background: #fef3c7; }
-  .play-ev--thinking & { border-color: #8b5cf6; background: #ede9fe; }
-  .play-ev--retrieving & { border-color: #3b82f6; background: #dbeafe; }
-  .play-ev--completed & { border-color: #10b981; background: #d1fae5; }
-  .play-ev--error & { border-color: #ef4444; background: #fee2e2; }
-  .play-ev--ui_action_plan & { border-color: #6366f1; background: #e0e7ff; }
+  .play-ev--tool_call & {
+    border-color: #f59e0b;
+    background: #fef3c7;
+  }
+
+  .play-ev--thinking & {
+    border-color: #8b5cf6;
+    background: #ede9fe;
+  }
+
+  .play-ev--retrieving & {
+    border-color: #3b82f6;
+    background: #dbeafe;
+  }
+
+  .play-ev--completed & {
+    border-color: #10b981;
+    background: #d1fae5;
+  }
+
+  .play-ev--error & {
+    border-color: #ef4444;
+    background: #fee2e2;
+  }
+
+  .play-ev--ui_action_plan & {
+    border-color: #6366f1;
+    background: #e0e7ff;
+  }
 }
 
-.play-ev__body { flex: 1; min-width: 0; }
+.play-ev__body {
+  flex: 1;
+  min-width: 0;
+}
 
 .play-ev__head {
   display: flex;
@@ -1551,7 +1752,18 @@ export default defineComponent({
   white-space: pre-wrap;
 }
 
-@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .play-run {
   display: flex;
   align-items: center;
@@ -1560,7 +1772,10 @@ export default defineComponent({
   border-radius: 6px;
   cursor: pointer;
   transition: background 120ms ease;
-  &:hover { background: var(--surface-sunken); }
+
+  &:hover {
+    background: var(--surface-sunken);
+  }
 }
 
 .play-memory {
@@ -1619,8 +1834,16 @@ export default defineComponent({
   transition: all 120ms ease;
   font-family: var(--font-sans);
 
-  &:hover { border-color: var(--brand-primary); color: var(--brand-primary); }
-  &--copied { background: #dcfce7; border-color: #16a34a; color: #16a34a; }
+  &:hover {
+    border-color: var(--brand-primary);
+    color: var(--brand-primary);
+  }
+
+  &--copied {
+    background: #dcfce7;
+    border-color: #16a34a;
+    color: #16a34a;
+  }
 }
 
 .play-curl__hint {
@@ -1656,10 +1879,16 @@ export default defineComponent({
   white-space: pre;
   overflow-x: auto;
   margin: 0;
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 
-  &::-webkit-scrollbar { height: 3px; }
-  &::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+  &::-webkit-scrollbar {
+    height: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+  }
 
   &--dim {
     background: var(--surface-overlay);
@@ -1668,4 +1897,93 @@ export default defineComponent({
     font-size: 10px;
   }
 }
+.play-attach-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 2px 8px;
+  }
+
+  .play-attach-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: var(--surface-overlay);
+    border: 1px solid var(--border-subtle);
+    font-size: 12px;
+    color: var(--text-secondary);
+    max-width: 220px;
+
+    &__name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    &__remove,
+    &__retry {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border: none;
+      background: transparent;
+      color: var(--text-quaternary);
+      cursor: pointer;
+      border-radius: 50%;
+
+      &:hover {
+        background: var(--surface-sunken);
+        color: var(--text-primary);
+      }
+    }
+
+    &--error {
+      border-color: rgba(239, 68, 68, 0.3);
+      background: var(--status-error-bg);
+      color: var(--status-error-text);
+    }
+  }
+
+  .play-attach-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 120ms ease;
+
+    &:hover {
+      background: var(--surface-sunken);
+      color: var(--brand-primary);
+    }
+  }
+
+  .play-msg__attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+
+  .play-msg__attach-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10.5px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.15);
+    color: inherit;
+    opacity: 0.9;
+  }
 </style>

@@ -44,6 +44,7 @@ export const routes = [
       { path: 'knowledge/sources', component: () => import('../modules/knowledge/sources/SourcesPage.vue') },
       { path: 'knowledge/webhooks', component: () => import('../modules/knowledge/webhooks/WebhooksPage.vue') },
       { path: 'business-objects', component: () => import('../modules/business-objects/BusinessObjectsPage.vue') },
+      { path: 'ui-metadata', component: () => import('../modules/ui-metadata/UIMetadataPage.vue') },
     ]
   },
   {

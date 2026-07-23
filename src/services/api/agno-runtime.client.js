@@ -122,7 +122,15 @@ class AgnoRuntimeClient {
   async listMemories(p) { const { data } = await this.http.get('/memories', { params: p }); return data }
   async listAgentMemories(agent_id) { const { data } = await this.http.get(`/agents/${agent_id}/memories`); return data }
   async deleteMemory(id) { await this.http.delete(`/memories/${id}`) }
-
+  async listCapabilityAssignments(p) { const { data } = await this.http.get('/capabilities/assignments', { params: p }); return data }
+  async setCapabilityAssignments(body) { const { data } = await this.http.post('/capabilities/assignments', body); return data }
+  async resolveCapabilities(body) { const { data } = await this.http.post('/capabilities/resolve', body); return data }
+  async uploadAttachment(formData) {
+    const { data } = await this.http.post('/attachments/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    return data
+  }
   // ===== HEALTH =====
   async health() { const { data } = await this.httpHealth.get('/health'); return data }
   async ready() { const { data } = await this.httpHealth.get('/ready'); return data }
