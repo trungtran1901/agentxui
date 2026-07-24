@@ -65,6 +65,10 @@
                 <q-item-section avatar><q-icon name="account_tree" /></q-item-section>
                 <q-item-section>Mở Builder</q-item-section>
               </q-item>
+              <q-item clickable v-close-popup :to="`/ai/workflows/${props.row.id}`">
+                <q-item-section avatar><q-icon name="schedule" /></q-item-section>
+                <q-item-section>Schedules & Webhooks</q-item-section>
+              </q-item>
               <q-item clickable v-close-popup @click="viewRuns(props.row)">
                 <q-item-section avatar><q-icon name="history" /></q-item-section>
                 <q-item-section>Lịch sử runs</q-item-section>
@@ -311,7 +315,6 @@ export default defineComponent({
       }
       saving.value = true
       try {
-        // Chuyển steps về đúng format API (agentCode/teamCode + order)
         const steps = form.value.steps.map((s, i) => ({
           order: i + 1,
           ...(s.targetType === 'Agent' ? { agentCode: s.agentCode } : { teamCode: s.teamCode })

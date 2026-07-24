@@ -16,6 +16,7 @@ export const routes = [
       { path: 'ai/models', component: () => import('../modules/ai-platform/models/ModelsPage.vue') },
       { path: 'ai/workflows', component: () => import('../modules/ai-platform/workflows/WorkflowsPage.vue') },
       { path: 'ai/workflows/:id/builder', component: () => import('../modules/ai-platform/workflows/WorkflowBuilder.vue') },
+      { path: 'ai/workflows/:id', component: () => import('../modules/ai-platform/workflows/WorkflowDetail.vue') },
       { path: 'ai/sessions', component: () => import('../modules/ai-platform/sessions/SessionsPage.vue') },
       { path: 'ai/memory', component: () => import('../modules/ai-platform/memory/MemoryPage.vue') },
       { path: 'ai/playground', component: () => import('../modules/ai-platform/playground/PlaygroundPage.vue') },
