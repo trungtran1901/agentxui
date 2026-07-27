@@ -34,7 +34,7 @@
               <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
               <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
               <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
-                }}</q-tooltip>
+              }}</q-tooltip>
             </router-link>
           </template>
 
@@ -47,7 +47,7 @@
               <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
               <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
               <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
-                }}</q-tooltip>
+              }}</q-tooltip>
             </router-link>
           </template>
 
@@ -60,7 +60,7 @@
               <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
               <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
               <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
-                }}</q-tooltip>
+              }}</q-tooltip>
             </router-link>
           </template>
 
@@ -73,7 +73,7 @@
               <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
               <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
               <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
-                }}</q-tooltip>
+              }}</q-tooltip>
             </router-link>
           </template>
           <!-- UI Metadata (NEW) -->
@@ -85,7 +85,19 @@
               <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
               <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
               <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
-              }}</q-tooltip>
+                }}</q-tooltip>
+            </router-link>
+          </template>
+          <!-- Quota Manager -->
+          <div v-if="!miniMode" class="sidenav__section-label" style="margin-top:16px">Quota Manager</div>
+          <div v-if="miniMode" class="sidenav__mini-divider" />
+
+          <template v-for="item in quotaItems" :key="item.to">
+            <router-link class="sidenav__item" :class="{ 'is-active': $route.path.startsWith(item.to) }" :to="item.to">
+              <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
+              <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
+              <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
+                }}</q-tooltip>
             </router-link>
           </template>
           <!-- Operations -->
@@ -97,7 +109,7 @@
               <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
               <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
               <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
-                }}</q-tooltip>
+              }}</q-tooltip>
             </router-link>
           </template>
 
@@ -110,7 +122,7 @@
               <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
               <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
               <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
-                }}</q-tooltip>
+              }}</q-tooltip>
             </router-link>
           </template>
         </div>
@@ -309,6 +321,10 @@ export default defineComponent({
     const uiMetadataItems = [
       { label: 'UI Metadata', icon: 'dashboard_customize', to: '/ui-metadata' },
     ]
+    const quotaItems = [
+      { label: 'Quota Policies', icon: 'speed', to: '/quota/policies' },
+      { label: 'Quota Usage', icon: 'query_stats', to: '/quota/usage' },
+    ]
     const opsItems = [
       { label: 'Events', icon: 'event_note', to: '/ops/events' },
       { label: 'Exec Logs', icon: 'receipt_long', to: '/ops/logs' },
@@ -328,7 +344,7 @@ export default defineComponent({
     return {
       leftDrawerOpen, miniMode, uiStore, dayjs,
       userName, userEmail, userInitials,
-      aiItems, knowledgeItems, mcpItems, businessObjectItems, opsItems, systemItems, uiMetadataItems,
+      aiItems, knowledgeItems, mcpItems, businessObjectItems, opsItems, systemItems, uiMetadataItems, quotaItems,
       toggleDark, logout
     }
   }

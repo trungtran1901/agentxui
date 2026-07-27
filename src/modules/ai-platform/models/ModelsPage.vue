@@ -24,6 +24,10 @@
               temp: {{ props.row.temperature }} · max_tokens: {{ props.row.max_tokens }}
               <span v-if="props.row.base_url"> · base_url: {{ props.row.base_url }}</span>
             </div>
+            <div v-if="props.row.cost_per_1k_input_tokens != null || props.row.cost_per_1k_output_tokens != null"
+              style="font-size:11px;color:var(--text-tertiary);margin-top:2px">
+              $/1k in: {{ props.row.cost_per_1k_input_tokens ?? '—' }} · $/1k out: {{ props.row.cost_per_1k_output_tokens ?? '—' }}
+            </div>
           </q-td>
         </template>
         <template #body-cell-enabled="props">
@@ -76,6 +80,28 @@
             <label class="field-label">Max Tokens</label>
             <q-input v-model.number="form.max_tokens" outlined dense type="number" step="1" min="1" />
           </div>
+        </div>
+
+        <div class="row q-col-gutter-md">
+          <div class="col-6">
+            <label class="field-label">
+              Cost / 1k input tokens (USD)
+              <span style="font-weight:400;color:var(--text-tertiary)">(tuỳ chọn)</span>
+            </label>
+            <q-input v-model.number="form.cost_per_1k_input_tokens" outlined dense type="number" step="0.0001" min="0"
+              placeholder="0.0025" />
+          </div>
+          <div class="col-6">
+            <label class="field-label">
+              Cost / 1k output tokens (USD)
+              <span style="font-weight:400;color:var(--text-tertiary)">(tuỳ chọn)</span>
+            </label>
+            <q-input v-model.number="form.cost_per_1k_output_tokens" outlined dense type="number" step="0.0001" min="0"
+              placeholder="0.0100" />
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text-quaternary);margin-top:-8px">
+          Dùng để quy đổi metric COST_USD trong Quota Management và các báo cáo chi phí. Để trống nếu chưa xác định.
         </div>
 
         <div v-if="form.provider === 'openai_like'" class="row q-col-gutter-md">
@@ -135,7 +161,7 @@ export default defineComponent({
     const rows = ref([]), loading = ref(false), saving = ref(false), dialog = ref(false), editItem = ref(null)
     const defaultForm = () => ({
       provider: 'openai', model: '', temperature: 0.7, max_tokens: 4096, enabled: true,
-      base_url: '', api_key: ''
+      base_url: '', api_key: '', cost_per_1k_input_tokens: null, cost_per_1k_output_tokens: null
     })
     const form = ref(defaultForm())
     const extraParamsText = ref(''), extraParamsError = ref('')
@@ -158,7 +184,9 @@ export default defineComponent({
       editItem.value = m
       form.value = {
         provider: m.provider, model: m.model, temperature: m.temperature, max_tokens: m.max_tokens, enabled: m.enabled,
-        base_url: m.base_url || '', api_key: m.api_key || ''
+        base_url: m.base_url || '', api_key: m.api_key || '',
+        cost_per_1k_input_tokens: m.cost_per_1k_input_tokens ?? null,
+        cost_per_1k_output_tokens: m.cost_per_1k_output_tokens ?? null
       }
       extraParamsText.value = m.extra_client_params && Object.keys(m.extra_client_params).length
         ? JSON.stringify(m.extra_client_params, null, 2) : ''
@@ -189,6 +217,8 @@ export default defineComponent({
             enabled: form.value.enabled,
             base_url: form.value.base_url || undefined,
             api_key: form.value.api_key || undefined,
+            cost_per_1k_input_tokens: form.value.cost_per_1k_input_tokens,
+            cost_per_1k_output_tokens: form.value.cost_per_1k_output_tokens,
             extra_client_params
           })
         } else {
@@ -200,6 +230,8 @@ export default defineComponent({
             enabled: form.value.enabled,
             base_url: form.value.base_url || undefined,
             api_key: form.value.api_key || undefined,
+            cost_per_1k_input_tokens: form.value.cost_per_1k_input_tokens,
+            cost_per_1k_output_tokens: form.value.cost_per_1k_output_tokens,
             extra_client_params
           })
         }

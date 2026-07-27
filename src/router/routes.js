@@ -46,6 +46,9 @@ export const routes = [
       { path: 'knowledge/webhooks', component: () => import('../modules/knowledge/webhooks/WebhooksPage.vue') },
       { path: 'business-objects', component: () => import('../modules/business-objects/BusinessObjectsPage.vue') },
       { path: 'ui-metadata', component: () => import('../modules/ui-metadata/UIMetadataPage.vue') },
+      { path: 'quota/policies', component: () => import('../modules/quota/policies/QuotaPoliciesPage.vue') },
+      { path: 'quota/usage', component: () => import('../modules/quota/usage/QuotaUsagePage.vue') },
+      { path: 'quota/users', component: () => import('../modules/quota/users/QuotaUsersPage.vue') },
     ]
   },
   {
