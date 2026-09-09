@@ -32,7 +32,9 @@
       :pagination="pagination"
       :show-create="true"
       @create="openCreate"
+      @edit="openEdit"
       @view="openDetail"
+      @delete="confirmDelete"
       @refresh="loadData"
       @search="onSearch"
       @page-change="onPageChange"
@@ -75,14 +77,21 @@
         </q-td>
       </template>
 
-      <!-- List actions stay view-only; edit/delete aren't exposed here yet
-           (server supports them via PUT/DELETE — see business-objects.client.js
-           if a future edit flow is needed). -->
+      <!-- List actions: view + edit (creates a new version via PUT) -->
       <template #body-cell-actions="props">
         <q-td :props="props" auto-width>
-          <button class="tbl-action-btn" @click="openDetail(props.row)" title="View">
-            <q-icon name="visibility" size="15px" />
-          </button>
+          <div style="display:flex;align-items:center;gap:2px;justify-content:flex-end">
+            <button class="tbl-action-btn" @click="openDetail(props.row)" title="View">
+              <q-icon name="visibility" size="15px" />
+            </button>
+            <button class="tbl-action-btn" @click="openEdit(props.row)" title="Edit (creates a new version)">
+              <q-icon name="edit" size="15px" />
+            </button>
+            <div class="tbl-action-divider" />
+            <button class="tbl-action-btn tbl-action-btn--danger" @click="confirmDelete(props.row)" title="Delete">
+              <q-icon name="delete_outline" size="15px" />
+            </button>
+          </div>
         </q-td>
       </template>
     </BaseCrudPage>
@@ -137,6 +146,7 @@
                     <span style="font-size:13px;font-weight:600;color:var(--text-primary)">{{ f.name }}</span>
                     <span v-if="f.required" class="code-tag" style="font-size:9px;color:var(--brand-danger)">required</span>
                   </div>
+                  <div v-if="f.description" style="font-size:11px;color:var(--text-tertiary);margin-top:2px">{{ f.description }}</div>
                   <div v-if="f.type === 'reference' && f.referenceObjectCode" style="font-size:11px;color:var(--text-tertiary);margin-top:2px">
                     references <span class="code-tag" style="font-size:10px">{{ f.referenceObjectCode }}</span>
                   </div>
@@ -180,27 +190,39 @@
         </template>
 
         <div class="dialog-footer">
+          <button class="btn btn--secondary" style="border-color:var(--status-error-text);color:var(--status-error-text)"
+            @click="detailDialog=false; confirmDelete(detailItem)">
+            <q-icon name="delete_outline" size="15px" />Delete
+          </button>
+          <div style="flex:1" />
           <button class="btn btn--secondary" @click="detailDialog=false">Close</button>
+          <button class="btn btn--primary" @click="detailDialog=false; openEdit(detailItem)">
+            <q-icon name="edit" size="15px" />Edit (new version)
+          </button>
         </div>
       </q-card>
     </q-dialog>
 
-    <!-- ============ CREATE DIALOG ============ -->
+    <!-- ============ CREATE / EDIT DIALOG ============ -->
     <BaseFormDialog
-      v-model="createDialog"
-      title="Create Business Object"
-      subtitle="POST /business-objects — version auto-assigned, starts at 1"
+      v-model="formDialog"
+      :title="editItem ? `Edit Business Object — ${editItem.code}` : 'Create Business Object'"
+      :subtitle="editItem ? `PUT /business-objects/${editItem.id} — creates a new version (v${(editItem.version||1)+1}); send the FULL payload, not a delta` : 'POST /business-objects — version auto-assigned, starts at 1'"
       icon="schema" icon-color="#6366f1"
-      confirm-label="Create" :loading="saving" width="760px"
+      :confirm-label="editItem ? 'Save new version' : 'Create'" :loading="saving" width="760px"
       @confirm="save"
     >
-      <div style="display:flex;flex-direction:column;gap:16px">
+      <div v-if="loadingEditPayload" class="empty-state" style="padding:32px">
+        <q-spinner size="24px" style="color:var(--brand-primary)" />
+      </div>
+      <div v-else style="display:flex;flex-direction:column;gap:16px">
         <!-- Identity -->
         <div class="row q-col-gutter-md">
           <div class="col-5">
             <label class="field-label">code <span style="color:var(--brand-danger)">*</span></label>
             <q-input v-model="form.code" outlined dense placeholder="leave_request"
-              hint="pattern: ^[a-z0-9][a-z0-9\-_.]*$ — lowercase, digits, - _ . only" />
+              :disable="!!editItem"
+              :hint="editItem ? 'Immutable — inherited from previous version' : 'pattern: ^[a-z0-9][a-z0-9\-_.]*$ — lowercase, digits, - _ . only'" />
           </div>
           <div class="col-7">
             <label class="field-label">name <span style="color:var(--brand-danger)">*</span></label>
@@ -224,29 +246,38 @@
           </div>
 
           <div v-for="(f, i) in form.fields" :key="i" class="bo-builder-row">
-            <div class="row q-col-gutter-sm items-start" style="width:100%">
-              <div class="col-3">
-                <q-input v-model="f.name" outlined dense placeholder="name" label="field name" />
-              </div>
-              <div class="col-3">
-                <q-select v-model="f.type" outlined dense use-input new-value-mode="add-unique"
-                  :options="fieldTypeOptions" label="type"
-                  hint="pick or type a custom type" />
-              </div>
-              <div class="col-2" style="padding-top:22px">
-                <q-toggle v-model="f.required" dense label="required" />
-              </div>
-              <div class="col-3">
-                <q-input v-if="f.type === 'reference'" v-model="f.referenceObjectCode" outlined dense
-                  placeholder="employee" label="referenceObjectCode" />
-                <q-input v-else-if="f.type === 'enum'" v-model="f.enumValuesText" outlined dense
-                  placeholder="pending,approved,rejected" label="enumValues (comma-separated)" />
-                <q-input v-else v-model="f.description" outlined dense placeholder="description (optional)" label="description" />
-              </div>
-              <div class="col-1" style="padding-top:22px">
-                <button class="btn btn--ghost btn--sm btn--icon" @click="removeField(i)" title="Remove field">
-                  <q-icon name="remove_circle_outline" size="16px" style="color:var(--brand-danger)" />
-                </button>
+            <div style="width:100%">
+              <div class="row q-col-gutter-sm items-start">
+                <div class="col-3">
+                  <q-input v-model="f.name" outlined dense placeholder="name" label="field name" />
+                </div>
+                <div class="col-3">
+                  <q-select v-model="f.type" outlined dense use-input new-value-mode="add-unique"
+                    :options="fieldTypeOptions" label="type"
+                    hint="pick or type a custom type" />
+                </div>
+                <div class="col-2" style="padding-top:22px">
+                  <q-toggle v-model="f.required" dense label="required" />
+                </div>
+                <!-- Type-specific extra field: reference -> referenceObjectCode, enum -> enumValues.
+                     These no longer hide the description box below — a reference
+                     field can (and usually should) still have its own description. -->
+                <div class="col-4">
+                  <q-input v-if="f.type === 'reference'" v-model="f.referenceObjectCode" outlined dense
+                    placeholder="employee" label="referenceObjectCode" />
+                  <q-input v-else-if="f.type === 'enum'" v-model="f.enumValuesText" outlined dense
+                    placeholder="pending,approved,rejected" label="enumValues (comma-separated)" />
+                  <div v-else style="height:40px" />
+                </div>
+                <div class="col-12">
+                  <q-input v-model="f.description" outlined dense placeholder="description (optional)" label="description" />
+                </div>
+                <div class="col-12" style="text-align:right">
+                  <button class="btn btn--ghost btn--sm" @click="removeField(i)" title="Remove field">
+                    <q-icon name="remove_circle_outline" size="15px" style="color:var(--brand-danger)" />
+                    Remove field
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -380,8 +411,11 @@ export default defineComponent({
 
     const detailDialog = ref(false), detailItem = ref(null), loadingDetail = ref(false), detailTab = ref('fields')
 
-    // ===== CREATE dialog state =====
-    const createDialog = ref(false), saving = ref(false), apiError = ref('')
+    // ===== CREATE / EDIT dialog state =====
+    const formDialog = ref(false), saving = ref(false), apiError = ref('')
+    // editItem !== null  => editing (PUT, new version). editItem === null => creating (POST).
+    const editItem = ref(null)
+    const loadingEditPayload = ref(false)
 
     const fieldTypeOptions = ['string', 'number', 'date', 'boolean', 'enum', 'reference']
     const cardinalityOptions = ['one-to-one', 'one-to-many', 'many-to-one', 'many-to-many']
@@ -411,22 +445,67 @@ export default defineComponent({
     function removeValidation(i) { form.value.validation.splice(i, 1) }
 
     function openCreate() {
+      editItem.value = null
       form.value = defaultForm()
       apiError.value = ''
-      createDialog.value = true
+      formDialog.value = true
+    }
+
+    // Populate the same dialog/form from an existing row for editing.
+    // We always re-fetch the LATEST version by code first — the row passed
+    // in (e.g. from a stale list snapshot or the read-only detail view)
+    // might not be the current version, and PUT must be issued against the
+    // most recent id to avoid silently branching off an old version.
+    async function openEdit(row) {
+      apiError.value = ''
+      formDialog.value = true
+      loadingEditPayload.value = true
+      try {
+        const latest = (await businessObjectsClient.getLatestByCode(row.code)) || row
+        editItem.value = latest
+        const payload = latest.payload || {}
+        form.value = {
+          code: latest.code,
+          name: latest.name,
+          description: latest.description || '',
+          fields: (payload.fields || []).map(f => ({
+            name: f.name || '',
+            type: f.type || 'string',
+            required: !!f.required,
+            description: f.description || '',
+            enumValuesText: (f.enumValues || []).join(','),
+            referenceObjectCode: f.referenceObjectCode || ''
+          })),
+          relationships: (payload.relationships || []).map(r => ({
+            name: r.name || '', targetObjectCode: r.targetObjectCode || '', cardinality: r.cardinality || 'many-to-one'
+          })),
+          validation: (payload.validation || []).map(v => ({ rule: v.rule || '', message: v.message || '' })),
+          businessMeaning: payload.businessMeaning || '',
+          enabled: latest.enabled ?? true
+        }
+      } catch (e) {
+        apiError.value = e.response?.data?.message || 'Failed to load latest version for editing'
+      } finally {
+        loadingEditPayload.value = false
+      }
     }
 
     async function save() {
       apiError.value = ''
 
-      if (!form.value.code || !form.value.name) {
-        apiError.value = 'code and name are required'
+      if (!form.value.name) {
+        apiError.value = 'name is required'
         return
       }
-      if (!CODE_PATTERN.test(form.value.code)) {
-        apiError.value = 'code must match ^[a-z0-9][a-z0-9\\-_.]*$ (lowercase, digits, - _ . only)'
-        return
+      if (!editItem.value) {
+        // Only validate/send code on create — it's immutable afterwards.
+        if (!form.value.code) { apiError.value = 'code is required'; return }
+        if (!CODE_PATTERN.test(form.value.code)) {
+          apiError.value = 'code must match ^[a-z0-9][a-z0-9\\-_.]*$ (lowercase, digits, - _ . only)'
+          return
+        }
       }
+
       const cleanFields = form.value.fields
         .filter(f => f.name && f.type)
         .map(f => {
@@ -449,27 +528,47 @@ export default defineComponent({
 
       saving.value = true
       try {
-        await businessObjectsClient.create({
-          code: form.value.code,
-          name: form.value.name,
-          description: form.value.description || undefined,
-          payload: {
-            fields: cleanFields,
-            relationships: cleanRelationships,
-            validation: cleanValidation,
-            businessMeaning: form.value.businessMeaning || undefined
-          },
-          enabled: form.value.enabled
-        })
-        $q.notify({ type: 'positive', message: `Business object "${form.value.code}" created` })
-        createDialog.value = false
+        if (editItem.value) {
+          // PUT /business-objects/{id} — creates a NEW version. payload is
+          // replaced wholesale server-side, so always send the complete
+          // object (fields + relationships + validation + businessMeaning),
+          // never a partial delta — see business-objects.client.js note.
+          await businessObjectsClient.update(editItem.value.id, {
+            name: form.value.name,
+            description: form.value.description || undefined,
+            payload: {
+              fields: cleanFields,
+              relationships: cleanRelationships,
+              validation: cleanValidation,
+              businessMeaning: form.value.businessMeaning || undefined
+            },
+            enabled: form.value.enabled
+          })
+          $q.notify({ type: 'positive', message: `New version created for "${form.value.code}"` })
+        } else {
+          await businessObjectsClient.create({
+            code: form.value.code,
+            name: form.value.name,
+            description: form.value.description || undefined,
+            payload: {
+              fields: cleanFields,
+              relationships: cleanRelationships,
+              validation: cleanValidation,
+              businessMeaning: form.value.businessMeaning || undefined
+            },
+            enabled: form.value.enabled
+          })
+          $q.notify({ type: 'positive', message: `Business object "${form.value.code}" created` })
+        }
+        formDialog.value = false
+        editItem.value = null
         pagination.value.page = 1
         loadData()
       } catch (e) {
         const d = e.response?.data
         apiError.value = d?.error_code === 'validation_failed'
           ? (d?.message || 'Validation failed (422) — check required fields and code pattern')
-          : (d?.message || 'Create failed')
+          : (d?.message || 'Save failed')
       } finally { saving.value = false }
     }
 
@@ -499,6 +598,29 @@ export default defineComponent({
       loadData()
     }
 
+    // Soft delete — DELETE /business-objects/{id}. Always resolve to the
+    // LATEST version's id first (same as edit), so deleting from a stale
+    // list snapshot never targets an old, already-superseded version.
+    function confirmDelete(row) {
+      $q.dialog({
+        title: 'Delete Business Object',
+        message: `Delete <strong>${row.name}</strong> (<code>${row.code}</code>)? This is a soft delete — the record is kept for history but disappears from listings.`,
+        html: true,
+        cancel: { label: 'Cancel', flat: true },
+        ok: { label: 'Delete', color: 'negative', unelevated: true }
+      }).onOk(async () => {
+        try {
+          const latest = (await businessObjectsClient.getLatestByCode(row.code)) || row
+          await businessObjectsClient.remove(latest.id)
+          $q.notify({ type: 'positive', message: `"${row.code}" deleted` })
+          if (detailItem.value?.code === row.code) detailDialog.value = false
+          loadData()
+        } catch (e) {
+          $q.notify({ type: 'negative', message: e.response?.data?.message || 'Delete failed' })
+        }
+      })
+    }
+
     async function openDetail(row) {
       detailItem.value = row
       detailDialog.value = true
@@ -522,9 +644,9 @@ export default defineComponent({
     return {
       available, rows, displayRows, columns, loading, pagination,
       detailDialog, detailItem, loadingDetail, detailTab,
-      createDialog, saving, apiError, form, fieldTypeOptions, cardinalityOptions,
+      formDialog, saving, apiError, editItem, loadingEditPayload, form, fieldTypeOptions, cardinalityOptions,
       addField, removeField, addRelationship, removeRelationship, addValidation, removeValidation,
-      openCreate, save,
+      openCreate, openEdit, save, confirmDelete,
       loadData, onSearch, onPageChange, openDetail
     }
   }

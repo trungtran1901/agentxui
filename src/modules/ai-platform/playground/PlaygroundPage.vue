@@ -120,6 +120,31 @@
               </div>
             </div>
 
+            <!-- Quota exceeded card -->
+            <div v-else-if="msg.role === 'quota_exceeded'" class="play-quota-card anim-fade">
+              <div class="play-quota-card__icon">
+                <q-icon name="speed" size="20px" />
+              </div>
+              <div class="play-quota-card__body">
+                <div class="play-quota-card__title">Đã đạt giới hạn sử dụng</div>
+                <div class="play-quota-card__desc">{{ msg.quota.friendlyMessage }}</div>
+
+                <div class="play-quota-card__meter">
+                  <div class="play-quota-card__meter-bar" :style="`width:${msg.quota.percent}%`" />
+                </div>
+                <div class="play-quota-card__meta">
+                  <span>{{ formatQuotaNum(msg.quota.used) }} / {{ formatQuotaNum(msg.quota.limit) }} {{ quotaMetricLabel(msg.quota.metric) }}</span>
+                  <span class="play-quota-card__dot">·</span>
+                  <span>{{ quotaPeriodLabel(msg.quota.period) }}</span>
+                </div>
+
+                <div v-if="msg.quota.retryable" class="play-quota-card__hint">
+                  <q-icon name="info" size="13px" />
+                  Hạn mức sẽ được reset theo chu kỳ — bạn có thể thử lại sau.
+                </div>
+              </div>
+            </div>
+
             <!-- Regular chat bubble -->
             <div v-else class="play-msg" :class="`play-msg--${msg.role}`">
               <div class="play-msg__avatar" :class="`play-msg__avatar--${msg.role}`">
@@ -425,6 +450,49 @@ export default defineComponent({
     // userId from Keycloak sub claim
     const userId = ref(keycloakService.getUserId() || '')
 
+    // ── Quota exceeded helpers ──────────────────────────────────────────────
+    function formatQuotaNum(v) {
+      if (v == null) return '0'
+      return Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })
+    }
+
+    function quotaMetricLabel(metric) {
+      return { TOKENS: 'tokens', REQUESTS: 'requests', COST_USD: 'USD' }[metric] || metric
+    }
+
+    function quotaPeriodLabel(period) {
+      return {
+        DAILY: 'giới hạn theo ngày',
+        MONTHLY: 'giới hạn theo tháng',
+        FIXED_WINDOW: 'giới hạn theo khung thời gian cố định'
+      }[period] || period
+    }
+
+    // Builds a friendly "quota_exceeded" chat message from the raw backend
+    // payload — the inner `data` object shown in the quota_exceeded frame:
+    // { error_code, message, retryable, scope_type, scope_value, metric, period, used, limit }
+    function buildQuotaExceededMessage(data) {
+      const used = data.used ?? 0
+      const limit = data.limit ?? 0
+      const percent = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 100
+      return {
+        id: Date.now().toString(),
+        role: 'quota_exceeded',
+        created_at: new Date(),
+        quota: {
+          friendlyMessage: data.message || 'Bạn đã vượt quá hạn mức sử dụng cho phép.',
+          metric: data.metric,
+          period: data.period,
+          used,
+          limit,
+          percent,
+          retryable: data.retryable !== false,
+          scopeType: data.scope_type,
+          scopeValue: data.scope_value
+        }
+      }
+    }
+
     // ── v2 Execution Plans — "advanced / multi-agent mode" ─────────────────
     // Additive alternative to the normal single-turn chat above — NOT a
     // replacement. When off, send() behaves exactly as before this feature
@@ -629,11 +697,31 @@ export default defineComponent({
     async function sendSync(body) {
       try {
         const res = await agnoClient.chat(body)
+
+        // Backend may return quota_exceeded as a normal 200 response, either
+        // as the top-level payload or nested under `data` — handle both shapes.
+        const quotaData = res?.data?.error_code === 'quota_exceeded'
+          ? res.data
+          : (res?.error_code === 'quota_exceeded' ? res : null)
+        if (quotaData) {
+          messages.value.push(buildQuotaExceededMessage(quotaData))
+          return
+        }
+
         if (res.session_id) sessionId.value = res.session_id
         if (res.run_id) { lastRunId.value = res.run_id; sessionRuns.value.unshift({ id: res.run_id, status: res.status || 'completed', created_at: new Date() }) }
         // API response field is "message", not "response"
         messages.value.push({ id: Date.now().toString(), role: 'assistant', content: res.message, created_at: new Date() })
       } catch (e) {
+        // Backend may also surface it as an HTTP error envelope
+        const errData = e.response?.data?.data?.error_code === 'quota_exceeded'
+          ? e.response.data.data
+          : (e.response?.data?.error_code === 'quota_exceeded' ? e.response.data : null)
+        if (errData) {
+          messages.value.push(buildQuotaExceededMessage(errData))
+          thinking.value = false; scrollBottom()
+          return
+        }
         const ec = e.response?.data?.error_code || 'error'
         const em = e.response?.data?.message || e.message
         messages.value.push({ id: Date.now().toString(), role: 'assistant', content: `[${ec}] ${em}`, created_at: new Date() })
@@ -765,6 +853,29 @@ export default defineComponent({
 
             // ── Envelope ────────────────────────────────────────────────────────
             const d = payload.data || {}
+
+            // ── Quota exceeded — check both the SSE `event:` line and the
+            //    nested error_code, since the backend may deliver this either
+            //    way (e.g. `event: quota_exceeded` or `data.error_code`) ────────
+            if (currentSseEvent === 'quota_exceeded' || d.error_code === 'quota_exceeded') {
+              thinking.value = false
+              removeProcessing()
+              streamBuf.value = ''
+              messages.value.push(buildQuotaExceededMessage(d))
+              streamEvents.value.unshift({
+                id: `${Date.now()}-quota`,
+                agno_event: 'QuotaExceeded',
+                type: currentSseEvent,
+                ui_status: 'error',
+                message: d.message,
+                detail: null,
+                payload,
+                ts: new Date()
+              })
+              scrollBottom()
+              continue
+            }
+
             const agno_event = d.agno_event || currentSseEvent
             const agui = d.agui || {}
             const ui_status = d.ui_status || agui.status || 'default'
@@ -1011,6 +1122,7 @@ export default defineComponent({
       agentOsCode, agentOsOptions, teamCode, teamOptions, agentCode, agentOptions, sessionId, lastRunId, userId, userInput, thinking, streamBuf, useStream, isCancelling, isStreaming, messages, streamEvents, sessionRuns, agentMemories, loadingMemory, rightTab, msgRef, textareaRef, highlightInput, panelTabs, dayjs, curlCopied, buildCurl, buildCancelCurl, copyCurl, toolEventIcon, loadOptions, loadTeams, loadAgents, startSession, send, loadRunEvents, loadMemory, autoResize, cancelStream,
       multiAgentMode, executionPlansAvailable, planSteps, planAgentOptions, planTeamOptions, lastPlanRunId, planStepTimeline,
       toggleMultiAgentMode, addPlanStep, removePlanStep, fileInputRef, attachments, onFilePick, onDrop, onPaste,
+      formatQuotaNum, quotaMetricLabel, quotaPeriodLabel,
     }
   }
 })
@@ -1637,6 +1749,88 @@ export default defineComponent({
     &:nth-child(3) {
       animation-delay: 0.4s;
     }
+  }
+}
+
+/* ===== Quota exceeded card (in chat stream) ===== */
+.play-quota-card {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--status-warning-bg);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  max-width: 85%;
+  align-self: flex-start;
+  animation: fadeIn 200ms ease;
+
+  &__icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(245, 158, 11, 0.15);
+    color: #d97706;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  &__body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--status-warning-text);
+    margin-bottom: 4px;
+  }
+
+  &__desc {
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+  }
+
+  &__meter {
+    height: 6px;
+    border-radius: 99px;
+    background: rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+
+  &__meter-bar {
+    height: 100%;
+    background: #d97706;
+    border-radius: 99px;
+    transition: width 300ms ease;
+  }
+
+  &__meta {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &__dot {
+    opacity: 0.5;
+  }
+
+  &__hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed rgba(245, 158, 11, 0.3);
+    font-size: 11px;
+    color: var(--text-tertiary);
   }
 }
 

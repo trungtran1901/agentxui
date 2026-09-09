@@ -322,6 +322,7 @@ export default defineComponent({
       { label: 'UI Metadata', icon: 'dashboard_customize', to: '/ui-metadata' },
     ]
     const quotaItems = [
+      { label: 'Quota Users', icon: 'groups', to: '/quota/users' },
       { label: 'Quota Policies', icon: 'speed', to: '/quota/policies' },
       { label: 'Quota Usage', icon: 'query_stats', to: '/quota/usage' },
     ]
