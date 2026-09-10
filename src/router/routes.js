@@ -49,6 +49,7 @@ export const routes = [
       { path: 'quota/policies', component: () => import('../modules/quota/policies/QuotaPoliciesPage.vue') },
       { path: 'quota/usage', component: () => import('../modules/quota/usage/QuotaUsagePage.vue') },
       { path: 'quota/users', component: () => import('../modules/quota/users/QuotaUsersPage.vue') },
+      { path: 'mcp/mcp-servers', component: () => import('../modules/mcp/mcpservers/MCPServersExternalPage.vue') },
     ]
   },
   {

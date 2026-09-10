@@ -34,7 +34,7 @@
               <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
               <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
               <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
-              }}</q-tooltip>
+                }}</q-tooltip>
             </router-link>
           </template>
 
@@ -47,7 +47,7 @@
               <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
               <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
               <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
-              }}</q-tooltip>
+                }}</q-tooltip>
             </router-link>
           </template>
 
@@ -60,7 +60,7 @@
               <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
               <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
               <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
-              }}</q-tooltip>
+                }}</q-tooltip>
             </router-link>
           </template>
 
@@ -73,7 +73,7 @@
               <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
               <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
               <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
-              }}</q-tooltip>
+                }}</q-tooltip>
             </router-link>
           </template>
           <!-- UI Metadata (NEW) -->
@@ -85,7 +85,7 @@
               <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
               <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
               <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
-                }}</q-tooltip>
+              }}</q-tooltip>
             </router-link>
           </template>
           <!-- Quota Manager -->
@@ -97,7 +97,7 @@
               <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
               <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
               <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
-                }}</q-tooltip>
+              }}</q-tooltip>
             </router-link>
           </template>
           <!-- Operations -->
@@ -109,7 +109,7 @@
               <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
               <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
               <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
-              }}</q-tooltip>
+                }}</q-tooltip>
             </router-link>
           </template>
 
@@ -122,7 +122,7 @@
               <span class="sidenav__item-icon"><q-icon :name="item.icon" size="18px" /></span>
               <span v-if="!miniMode" class="sidenav__item-label">{{ item.label }}</span>
               <q-tooltip v-if="miniMode" anchor="center right" self="center left" :offset="[8, 0]">{{ item.label
-              }}</q-tooltip>
+                }}</q-tooltip>
             </router-link>
           </template>
         </div>
@@ -306,6 +306,7 @@ export default defineComponent({
 
     const mcpItems = [
       { label: 'Capabilities', icon: 'build_circle', to: '/mcp/capabilities' },
+      { label: 'MCP Servers', icon: 'dns', to: '/mcp/mcp-servers' },
       { label: 'Assignments', icon: 'rule_folder', to: '/mcp/assignments' },
       { label: 'Testing Console', icon: 'terminal', to: '/mcp/console' },
       { label: 'Exec Logs', icon: 'receipt_long', to: '/mcp/logs' },

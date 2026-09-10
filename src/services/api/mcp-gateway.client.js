@@ -100,7 +100,35 @@ class MCPGatewayClient {
     const { data } = await this.http.post('/execute', body)
     return data
   }
+  /** POST /mcp-servers */
+  async createMcpServer(body) {
+    // body: { name, transport: 'stdio'|'sse'|'streamable_http', connection, enabled? }
+    const { data } = await this.http.post('/mcp-servers', body)
+    return data
+  }
 
+  /** GET /mcp-servers — currently only returns enabled=true servers, no pagination/filter */
+  async listMcpServers() {
+    const { data } = await this.http.get('/mcp-servers')
+    return data // { items: [...] }
+  }
+
+  /** POST /mcp-servers/{id}/enable */
+  async enableMcpServer(id) {
+    const { data } = await this.http.post(`/mcp-servers/${id}/enable`)
+    return data
+  }
+
+  /** POST /mcp-servers/{id}/disable */
+  async disableMcpServer(id) {
+    const { data } = await this.http.post(`/mcp-servers/${id}/disable`)
+    return data
+  }
+
+  /** DELETE /mcp-servers/{id} — 204, soft delete */
+  async deleteMcpServer(id) {
+    await this.http.delete(`/mcp-servers/${id}`)
+  }
   // =============================================
   // HEALTH
   // =============================================

@@ -3,7 +3,7 @@
     <div class="page-header">
       <div class="page-header__left">
         <h1 class="page-title">MCP Capabilities</h1>
-        <p class="page-subtitle">GET /api/v1/capabilities (MCP Gateway) — registry of callable capabilities (mock | http | n8n)</p>
+        <p class="page-subtitle">GET /api/v1/capabilities (MCP Gateway) — registry of callable capabilities (mock | http | n8n | mcp)</p>
       </div>
       <div class="page-header__actions">
         <button class="btn btn--secondary" @click="loadData">
@@ -18,7 +18,7 @@
 
     <!-- Filters -->
     <div class="filter-bar">
-      <q-select v-model="filterProvider" :options="['mock','http','n8n']" clearable outlined dense
+      <q-select v-model="filterProvider" :options="['mock','http','n8n','mcp']" clearable outlined dense
         label="provider_type" style="min-width:160px" @update:model-value="loadData" />
       <q-select v-model="filterEnabled" :options="enabledOptions" clearable outlined dense emit-value map-options
         label="enabled" style="min-width:140px" @update:model-value="loadData" />
@@ -98,13 +98,29 @@
         <div class="row q-col-gutter-md">
           <div class="col-5">
             <label class="field-label">provider_type <span style="color:var(--brand-danger)">*</span></label>
-            <q-select v-model="form.provider_type" outlined dense :options="['mock','http','n8n']" />
+            <q-select v-model="form.provider_type" outlined dense :options="['mock','http','n8n','mcp']"
+              @update:model-value="onProviderTypeChange" />
           </div>
-          <div class="col-7" v-if="form.provider_type !== 'mock'">
+          <div class="col-7" v-if="form.provider_type === 'http' || form.provider_type === 'n8n'">
             <label class="field-label">endpoint</label>
             <q-input v-model="form.endpoint" outlined dense placeholder="http://crm.internal/customers" />
           </div>
         </div>
+
+        <div v-if="form.provider_type === 'mcp'" class="row q-col-gutter-md">
+          <div class="col-6">
+            <label class="field-label">mcp_server <span style="color:var(--brand-danger)">*</span></label>
+            <q-select v-model="mcpServerName" :options="mcpServerOptions" outlined dense
+              emit-value map-options placeholder="Select MCP server"
+              hint="Only enabled servers — GET /mcp-servers" />
+          </div>
+          <div class="col-6">
+            <label class="field-label">tool_name <span style="color:var(--brand-danger)">*</span></label>
+            <q-input v-model="mcpToolName" outlined dense placeholder="create_chart"
+              hint="No discovery endpoint yet — check the MCP server's docs" />
+          </div>
+        </div>
+
         <div>
           <label class="field-label">input_schema (JSON Schema)</label>
           <textarea v-model="inputSchemaText" class="json-textarea" rows="4" placeholder='{"type":"object","required":["name"],"properties":{"name":{"type":"string"}}}' />
@@ -173,6 +189,8 @@ export default defineComponent({
     const form = ref(defaultForm())
     const inputSchemaText = ref(''), outputSchemaText = ref('')
 
+    const mcpServerOptions = ref([]), mcpServerName = ref(null), mcpToolName = ref('')
+
     const testDialog = ref(false), testItem = ref(null), testPayloadText = ref('{}'), testResult = ref(null), testing = ref(false)
 
     const columns = [
@@ -184,7 +202,27 @@ export default defineComponent({
 
     const providerTagStyle = p => p === 'http' ? 'background:#dbeafe;color:#1e40af'
       : p === 'n8n' ? 'background:#ede9fe;color:#5b21b6'
+      : p === 'mcp' ? 'background:#dcfce7;color:#166534'
       : 'background:#f3f4f6;color:#374151'
+
+    function splitMcpEndpoint(endpoint) {
+      const idx = (endpoint || '').indexOf('::')
+      if (idx === -1) return { server: null, tool: '' }
+      return { server: endpoint.slice(0, idx), tool: endpoint.slice(idx + 2) }
+    }
+
+    function onProviderTypeChange() {
+      form.value.endpoint = ''
+      mcpServerName.value = null
+      mcpToolName.value = ''
+    }
+
+    async function loadMcpServers() {
+      try {
+        const res = await mcpClient.listMcpServers()
+        mcpServerOptions.value = (res.items || []).map(s => ({ label: `${s.name} (${s.transport})`, value: s.name }))
+      } catch { mcpServerOptions.value = [] }
+    }
 
     async function loadData() {
       loading.value = true
@@ -212,6 +250,7 @@ export default defineComponent({
     function openCreate() {
       editItem.value = null; apiError.value = ''
       form.value = defaultForm(); inputSchemaText.value = ''; outputSchemaText.value = ''
+      mcpServerName.value = null; mcpToolName.value = ''
       dialog.value = true
     }
 
@@ -220,6 +259,14 @@ export default defineComponent({
       form.value = { code: item.code, name: item.name, description: item.description || '', provider_type: item.provider_type, endpoint: item.endpoint || '', enabled: item.enabled }
       inputSchemaText.value = item.input_schema ? JSON.stringify(item.input_schema, null, 2) : ''
       outputSchemaText.value = item.output_schema ? JSON.stringify(item.output_schema, null, 2) : ''
+      if (item.provider_type === 'mcp') {
+        const { server, tool } = splitMcpEndpoint(item.endpoint)
+        mcpServerName.value = server
+        mcpToolName.value = tool
+      } else {
+        mcpServerName.value = null
+        mcpToolName.value = ''
+      }
       dialog.value = true
     }
 
@@ -233,6 +280,14 @@ export default defineComponent({
       if (!form.value.code || !form.value.name || !form.value.provider_type) {
         apiError.value = 'code, name and provider_type are required'; return
       }
+
+      if (form.value.provider_type === 'mcp') {
+        if (!mcpServerName.value || !mcpToolName.value.trim()) {
+          apiError.value = 'mcp_server and tool_name are required for provider_type "mcp"'; return
+        }
+        form.value.endpoint = `${mcpServerName.value}::${mcpToolName.value.trim()}`
+      }
+
       let input_schema, output_schema
       try {
         input_schema = parseJsonField(inputSchemaText.value, 'input_schema')
@@ -281,8 +336,6 @@ export default defineComponent({
       catch { $q.notify({ type: 'negative', message: 'Payload is not valid JSON' }); return }
       testing.value = true; testResult.value = null
       try {
-        // POST /execute — success:false here means the gateway worked but the
-        // downstream provider rejected the request (still HTTP 200)
         testResult.value = await mcpClient.execute({ capability: testItem.value.code, payload })
       } catch (e) {
         const env = e.response?.data
@@ -290,9 +343,10 @@ export default defineComponent({
       } finally { testing.value = false }
     }
 
-    onMounted(loadData)
+    onMounted(() => { loadData(); loadMcpServers() })
     return { rows, columns, loading, saving, total, dialog, editItem, apiError, filterProvider, filterEnabled,
       enabledOptions, pagination, form, inputSchemaText, outputSchemaText, providerTagStyle,
+      mcpServerOptions, mcpServerName, mcpToolName, onProviderTypeChange,
       testDialog, testItem, testPayloadText, testResult, testing,
       loadData, onRequest, openCreate, openEdit, save, toggleEnabled, confirmDelete, openTest, runTest }
   }
